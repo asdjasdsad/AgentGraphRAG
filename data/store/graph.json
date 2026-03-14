@@ -1,0 +1,145 @@
+{
+  "entities": [
+    {
+      "name": "液压泵",
+      "type": "Component",
+      "attributes": {}
+    },
+    {
+      "name": "密封圈",
+      "type": "Component",
+      "attributes": {}
+    },
+    {
+      "name": "泄漏",
+      "type": "Phenomenon",
+      "attributes": {}
+    },
+    {
+      "name": "老化",
+      "type": "Cause",
+      "attributes": {}
+    },
+    {
+      "name": "更换",
+      "type": "Action",
+      "attributes": {}
+    },
+    {
+      "name": "复测",
+      "type": "Action",
+      "attributes": {}
+    },
+    {
+      "name": "Q2025-001",
+      "type": "Issue",
+      "attributes": {}
+    },
+    {
+      "name": "轴承",
+      "type": "Component",
+      "attributes": {}
+    },
+    {
+      "name": "过热",
+      "type": "Phenomenon",
+      "attributes": {}
+    },
+    {
+      "name": "Q2025-002",
+      "type": "Issue",
+      "attributes": {}
+    },
+    {
+      "name": "Q2025-010",
+      "type": "Issue",
+      "attributes": {}
+    }
+  ],
+  "relations": [
+    {
+      "source": "老化",
+      "type": "CAUSES",
+      "target": "泄漏",
+      "attributes": {}
+    },
+    {
+      "source": "更换",
+      "type": "MITIGATES",
+      "target": "老化",
+      "attributes": {}
+    },
+    {
+      "source": "复测",
+      "type": "MITIGATES",
+      "target": "老化",
+      "attributes": {}
+    },
+    {
+      "source": "Q2025-001",
+      "type": "HAS_PHENOMENON",
+      "target": "泄漏",
+      "attributes": {}
+    },
+    {
+      "source": "Q2025-001",
+      "type": "INVOLVES_COMPONENT",
+      "target": "液压泵",
+      "attributes": {}
+    },
+    {
+      "source": "Q2025-001",
+      "type": "INVOLVES_COMPONENT",
+      "target": "密封圈",
+      "attributes": {}
+    },
+    {
+      "source": "Q2025-001",
+      "type": "HAS_ACTION",
+      "target": "更换",
+      "attributes": {}
+    },
+    {
+      "source": "Q2025-001",
+      "type": "HAS_ACTION",
+      "target": "复测",
+      "attributes": {}
+    },
+    {
+      "source": "Q2025-002",
+      "type": "HAS_PHENOMENON",
+      "target": "过热",
+      "attributes": {}
+    },
+    {
+      "source": "Q2025-002",
+      "type": "INVOLVES_COMPONENT",
+      "target": "轴承",
+      "attributes": {}
+    },
+    {
+      "source": "Q2025-010",
+      "type": "HAS_PHENOMENON",
+      "target": "泄漏",
+      "attributes": {}
+    },
+    {
+      "source": "Q2025-010",
+      "type": "INVOLVES_COMPONENT",
+      "target": "液压泵",
+      "attributes": {}
+    },
+    {
+      "source": "Q2025-010",
+      "type": "INVOLVES_COMPONENT",
+      "target": "密封圈",
+      "attributes": {}
+    },
+    {
+      "source": "Q2025-010",
+      "type": "HAS_ACTION",
+      "target": "更换",
+      "attributes": {}
+    }
+  ]
+}

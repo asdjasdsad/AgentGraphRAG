@@ -1,0 +1,16 @@
+[
+  {
+    "rule_id": "risk_001",
+    "rule_type": "keyword",
+    "content": "失效|停飞|安全事故",
+    "level": "high",
+    "enabled": true
+  },
+  {
+    "rule_id": "risk_002",
+    "rule_type": "keyword",
+    "content": "整改|根因",
+    "level": "medium",
+    "enabled": true
+  }
+]

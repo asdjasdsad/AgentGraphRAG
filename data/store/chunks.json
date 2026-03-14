@@ -1,0 +1,421 @@
+[
+  {
+    "chunk_id": "chunk_b49892775b57",
+    "document_id": "Q2025-001",
+    "doc_type": "issue_record",
+    "chunk_type": "general",
+    "section_path": "structured_record",
+    "content": "问题编号：Q2025-001；现象：液压泵泄漏；部件：液压泵、密封圈；原因：密封圈老化；措施：更换密封圈、复测验证",
+    "page_no": null,
+    "issue_id": "Q2025-001",
+    "component": [
+      "液压泵",
+      "密封圈"
+    ],
+    "source_type": "structured",
+    "load_batch_id": "verify_batch",
+    "metadata": {
+      "issue_id": "Q2025-001",
+      "phenomenon": "液压泵泄漏",
+      "component": [
+        "液压泵",
+        "密封圈"
+      ],
+      "cause": [
+        "密封圈老化"
+      ],
+      "action": [
+        "更换密封圈",
+        "复测验证"
+      ],
+      "source_type": "structured",
+      "source_system": "demo",
+      "load_batch_id": "verify_batch"
+    }
+  },
+  {
+    "chunk_id": "chunk_9a15405ccd9a",
+    "document_id": "Q2025-002",
+    "doc_type": "issue_record",
+    "chunk_type": "general",
+    "section_path": "structured_record",
+    "content": "问题编号：Q2025-002；现象：轴承过热；部件：轴承；原因：润滑不足；措施：补充润滑脂、复检温升",
+    "page_no": null,
+    "issue_id": "Q2025-002",
+    "component": [
+      "轴承"
+    ],
+    "source_type": "structured",
+    "load_batch_id": "verify_batch",
+    "metadata": {
+      "issue_id": "Q2025-002",
+      "phenomenon": "轴承过热",
+      "component": [
+        "轴承"
+      ],
+      "cause": [
+        "润滑不足"
+      ],
+      "action": [
+        "补充润滑脂",
+        "复检温升"
+      ],
+      "source_type": "structured",
+      "source_system": "demo",
+      "load_batch_id": "verify_batch"
+    }
+  },
+  {
+    "chunk_id": "chunk_f8354d6fead4",
+    "document_id": "Q2025-001",
+    "doc_type": "issue_record",
+    "chunk_type": "general",
+    "section_path": "structured_record",
+    "content": "问题编号：Q2025-001；现象：液压泵泄漏；部件：液压泵、密封圈；原因：密封圈老化；措施：更换密封圈、复测验证",
+    "page_no": null,
+    "issue_id": "Q2025-001",
+    "component": [
+      "液压泵",
+      "密封圈"
+    ],
+    "source_type": "structured",
+    "load_batch_id": "verify_batch_2",
+    "metadata": {
+      "issue_id": "Q2025-001",
+      "phenomenon": "液压泵泄漏",
+      "component": [
+        "液压泵",
+        "密封圈"
+      ],
+      "cause": [
+        "密封圈老化"
+      ],
+      "action": [
+        "更换密封圈",
+        "复测验证"
+      ],
+      "source_type": "structured",
+      "source_system": "demo",
+      "load_batch_id": "verify_batch_2"
+    }
+  },
+  {
+    "chunk_id": "chunk_4a56d2e3def7",
+    "document_id": "Q2025-002",
+    "doc_type": "issue_record",
+    "chunk_type": "general",
+    "section_path": "structured_record",
+    "content": "问题编号：Q2025-002；现象：轴承过热；部件：轴承；原因：润滑不足；措施：补充润滑脂、复检温升",
+    "page_no": null,
+    "issue_id": "Q2025-002",
+    "component": [
+      "轴承"
+    ],
+    "source_type": "structured",
+    "load_batch_id": "verify_batch_2",
+    "metadata": {
+      "issue_id": "Q2025-002",
+      "phenomenon": "轴承过热",
+      "component": [
+        "轴承"
+      ],
+      "cause": [
+        "润滑不足"
+      ],
+      "action": [
+        "补充润滑脂",
+        "复检温升"
+      ],
+      "source_type": "structured",
+      "source_system": "demo",
+      "load_batch_id": "verify_batch_2"
+    }
+  },
+  {
+    "chunk_id": "chunk_5c781e0a5f49",
+    "document_id": "Q2025-001",
+    "doc_type": "issue_record",
+    "chunk_type": "general",
+    "section_path": "structured_record",
+    "content": "问题编号：Q2025-001；现象：液压泵泄漏；部件：液压泵、密封圈；原因：密封圈老化；措施：更换密封圈、复测验证",
+    "page_no": null,
+    "issue_id": "Q2025-001",
+    "component": [
+      "液压泵",
+      "密封圈"
+    ],
+    "source_type": "structured",
+    "load_batch_id": "verify_batch_3",
+    "metadata": {
+      "issue_id": "Q2025-001",
+      "phenomenon": "液压泵泄漏",
+      "component": [
+        "液压泵",
+        "密封圈"
+      ],
+      "cause": [
+        "密封圈老化"
+      ],
+      "action": [
+        "更换密封圈",
+        "复测验证"
+      ],
+      "source_type": "structured",
+      "source_system": "demo",
+      "load_batch_id": "verify_batch_3"
+    }
+  },
+  {
+    "chunk_id": "chunk_8b04d362b37b",
+    "document_id": "Q2025-002",
+    "doc_type": "issue_record",
+    "chunk_type": "general",
+    "section_path": "structured_record",
+    "content": "问题编号：Q2025-002；现象：轴承过热；部件：轴承；原因：润滑不足；措施：补充润滑脂、复检温升",
+    "page_no": null,
+    "issue_id": "Q2025-002",
+    "component": [
+      "轴承"
+    ],
+    "source_type": "structured",
+    "load_batch_id": "verify_batch_3",
+    "metadata": {
+      "issue_id": "Q2025-002",
+      "phenomenon": "轴承过热",
+      "component": [
+        "轴承"
+      ],
+      "cause": [
+        "润滑不足"
+      ],
+      "action": [
+        "补充润滑脂",
+        "复检温升"
+      ],
+      "source_type": "structured",
+      "source_system": "demo",
+      "load_batch_id": "verify_batch_3"
+    }
+  },
+  {
+    "chunk_id": "chunk_23bf50042b77",
+    "document_id": "Q2025-001",
+    "doc_type": "issue_record",
+    "chunk_type": "general",
+    "section_path": "structured_record",
+    "content": "问题编号：Q2025-001；现象：液压泵泄漏；部件：液压泵、密封圈；原因：密封圈老化；措施：更换密封圈、复测验证",
+    "page_no": null,
+    "issue_id": "Q2025-001",
+    "component": [
+      "液压泵",
+      "密封圈"
+    ],
+    "source_type": "structured",
+    "load_batch_id": "verify_batch_4",
+    "metadata": {
+      "issue_id": "Q2025-001",
+      "phenomenon": "液压泵泄漏",
+      "component": [
+        "液压泵",
+        "密封圈"
+      ],
+      "cause": [
+        "密封圈老化"
+      ],
+      "action": [
+        "更换密封圈",
+        "复测验证"
+      ],
+      "source_type": "structured",
+      "source_system": "demo",
+      "load_batch_id": "verify_batch_4"
+    }
+  },
+  {
+    "chunk_id": "chunk_22ed87850e51",
+    "document_id": "Q2025-002",
+    "doc_type": "issue_record",
+    "chunk_type": "general",
+    "section_path": "structured_record",
+    "content": "问题编号：Q2025-002；现象：轴承过热；部件：轴承；原因：润滑不足；措施：补充润滑脂、复检温升",
+    "page_no": null,
+    "issue_id": "Q2025-002",
+    "component": [
+      "轴承"
+    ],
+    "source_type": "structured",
+    "load_batch_id": "verify_batch_4",
+    "metadata": {
+      "issue_id": "Q2025-002",
+      "phenomenon": "轴承过热",
+      "component": [
+        "轴承"
+      ],
+      "cause": [
+        "润滑不足"
+      ],
+      "action": [
+        "补充润滑脂",
+        "复检温升"
+      ],
+      "source_type": "structured",
+      "source_system": "demo",
+      "load_batch_id": "verify_batch_4"
+    }
+  },
+  {
+    "chunk_id": "chunk_bb42ad7a13c9",
+    "document_id": "Q2025-010",
+    "doc_type": "issue_record",
+    "chunk_type": "general",
+    "section_path": "structured_record",
+    "content": "问题编号：Q2025-010；现象：液压泵泄漏；部件：液压泵；原因：密封圈老化；措施：更换密封圈",
+    "page_no": null,
+    "issue_id": "Q2025-010",
+    "component": [
+      "液压泵"
+    ],
+    "source_type": "structured",
+    "load_batch_id": "test_batch",
+    "metadata": {
+      "issue_id": "Q2025-010",
+      "phenomenon": "液压泵泄漏",
+      "component": [
+        "液压泵"
+      ],
+      "cause": [
+        "密封圈老化"
+      ],
+      "action": [
+        "更换密封圈"
+      ],
+      "source_type": "structured",
+      "source_system": "api",
+      "load_batch_id": "test_batch"
+    }
+  },
+  {
+    "chunk_id": "chunk_74ff8533aa48",
+    "document_id": "Q2025-010",
+    "doc_type": "issue_record",
+    "chunk_type": "general",
+    "section_path": "structured_record",
+    "content": "问题编号：Q2025-010；现象：液压泵泄漏；部件：液压泵；原因：密封圈老化；措施：更换密封圈",
+    "page_no": null,
+    "issue_id": "Q2025-010",
+    "component": [
+      "液压泵"
+    ],
+    "source_type": "structured",
+    "load_batch_id": "test_batch",
+    "metadata": {
+      "issue_id": "Q2025-010",
+      "phenomenon": "液压泵泄漏",
+      "component": [
+        "液压泵"
+      ],
+      "cause": [
+        "密封圈老化"
+      ],
+      "action": [
+        "更换密封圈"
+      ],
+      "source_type": "structured",
+      "source_system": "api",
+      "load_batch_id": "test_batch"
+    }
+  },
+  {
+    "chunk_id": "chunk_a9680284fbb0",
+    "document_id": "Q2025-010",
+    "doc_type": "issue_record",
+    "chunk_type": "general",
+    "section_path": "structured_record",
+    "content": "问题编号：Q2025-010；现象：液压泵泄漏；部件：液压泵；原因：密封圈老化；措施：更换密封圈",
+    "page_no": null,
+    "issue_id": "Q2025-010",
+    "component": [
+      "液压泵"
+    ],
+    "source_type": "structured",
+    "load_batch_id": "test_batch",
+    "metadata": {
+      "issue_id": "Q2025-010",
+      "phenomenon": "液压泵泄漏",
+      "component": [
+        "液压泵"
+      ],
+      "cause": [
+        "密封圈老化"
+      ],
+      "action": [
+        "更换密封圈"
+      ],
+      "source_type": "structured",
+      "source_system": "api",
+      "load_batch_id": "test_batch"
+    }
+  },
+  {
+    "chunk_id": "chunk_c5334c088f0b",
+    "document_id": "Q2025-010",
+    "doc_type": "issue_record",
+    "chunk_type": "general",
+    "section_path": "structured_record",
+    "content": "问题编号：Q2025-010；现象：液压泵泄漏；部件：液压泵；原因：密封圈老化；措施：更换密封圈",
+    "page_no": null,
+    "issue_id": "Q2025-010",
+    "component": [
+      "液压泵"
+    ],
+    "source_type": "structured",
+    "load_batch_id": "test_batch",
+    "metadata": {
+      "issue_id": "Q2025-010",
+      "phenomenon": "液压泵泄漏",
+      "component": [
+        "液压泵"
+      ],
+      "cause": [
+        "密封圈老化"
+      ],
+      "action": [
+        "更换密封圈"
+      ],
+      "source_type": "structured",
+      "source_system": "api",
+      "load_batch_id": "test_batch"
+    }
+  },
+  {
+    "chunk_id": "chunk_920feb2e8485",
+    "document_id": "Q2025-010",
+    "doc_type": "issue_record",
+    "chunk_type": "general",
+    "section_path": "structured_record",
+    "content": "问题编号：Q2025-010；现象：液压泵泄漏；部件：液压泵；原因：密封圈老化；措施：更换密封圈",
+    "page_no": null,
+    "issue_id": "Q2025-010",
+    "component": [
+      "液压泵"
+    ],
+    "source_type": "structured",
+    "load_batch_id": "test_batch",
+    "metadata": {
+      "issue_id": "Q2025-010",
+      "phenomenon": "液压泵泄漏",
+      "component": [
+        "液压泵"
+      ],
+      "cause": [
+        "密封圈老化"
+      ],
+      "action": [
+        "更换密封圈"
+      ],
+      "source_type": "structured",
+      "source_system": "api",
+      "load_batch_id": "test_batch"
+    }
+  }
+]

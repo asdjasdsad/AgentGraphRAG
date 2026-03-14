@@ -1,0 +1,96 @@
+[
+  {
+    "trace_id": "trace_af48ad918e1e",
+    "user_id": "u001",
+    "question": "??????????????",
+    "route": "vector",
+    "risk_level": "low",
+    "final_answer": "综合现有证据，可能的分析结论如下：基于 milvus 证据：问题编号：Q2025-001；现象：液压泵泄漏；部件：液压泵、密封圈；原因：密封圈老化；措施：更换密封圈、复测验证；基于 milvus 证据：问题编号：Q2025-002；现象：轴承过热；部件：轴承；原因：润滑不足；措施：补充润滑脂、复检温升；基于 milvus 证据：问题编号：Q2025-001；现象：液压泵泄漏；部件：液压泵、密封圈；原因：密封圈老化；措施：更换密封圈、复测验证",
+    "created_at": "2026-03-10T07:51:39.498106",
+    "evidence_ids": [
+      "chunk_b49892775b57",
+      "chunk_9a15405ccd9a",
+      "chunk_f8354d6fead4",
+      "chunk_4a56d2e3def7",
+      "chunk_5c781e0a5f49"
+    ],
+    "fallback_mode": "none"
+  },
+  {
+    "trace_id": "trace_65edcb2222ed",
+    "user_id": "u001",
+    "question": "液压泵泄漏的原因有哪些？",
+    "route": "graph",
+    "risk_level": "low",
+    "final_answer": "综合现有证据，可能的分析结论如下：基于 neo4j 证据：老化 -[CAUSES]-> 泄漏",
+    "created_at": "2026-03-10T08:42:39.414223",
+    "evidence_ids": [
+      "graph_老化_泄漏"
+    ],
+    "fallback_mode": "none"
+  },
+  {
+    "trace_id": "trace_6306b80684a3",
+    "user_id": "u001",
+    "question": "液压泵泄漏的原因有哪些？",
+    "route": "graph",
+    "risk_level": "low",
+    "final_answer": "综合现有证据，可能的分析结论如下：基于 neo4j 证据：老化 -[CAUSES]-> 泄漏",
+    "created_at": "2026-03-10T09:39:49.928493",
+    "evidence_ids": [
+      "graph_老化_泄漏"
+    ],
+    "fallback_mode": "none"
+  },
+  {
+    "trace_id": "trace_79542a2755ba",
+    "user_id": "u001",
+    "question": "液压泵泄漏的原因有哪些？",
+    "route": "vector",
+    "risk_level": "low",
+    "final_answer": "结论：当前证据还不足以支撑强结论，只能给出保守摘要。\n关键证据：\n- [milvus] 问题编号：Q2025-001；现象：液压泵泄漏；部件：液压泵、密封圈；原因：密封圈老化；措施：更换密封圈、复测验证 (score=0.320)\n- [milvus] 问题编号：Q2025-001；现象：液压泵泄漏；部件：液压泵、密封圈；原因：密封圈老化；措施：更换密封圈、复测验证 (score=0.320)\n- [milvus] 问题编号：Q2025-001；现象：液压泵泄漏；部件：液压泵、密封圈；原因：密封圈老化；措施：更换密封圈、复测验证 (score=0.320)\n建议动作：补充历史案例、图关系路径或更精准的问题约束后再检索。",
+    "created_at": "2026-03-10T10:27:55.615679",
+    "evidence_ids": [
+      "chunk_b49892775b57",
+      "chunk_f8354d6fead4",
+      "chunk_5c781e0a5f49",
+      "chunk_23bf50042b77",
+      "chunk_9a15405ccd9a"
+    ],
+    "fallback_mode": "summary_only"
+  },
+  {
+    "trace_id": "trace_bf4704860ad9",
+    "user_id": "u001",
+    "question": "液压泵泄漏的原因有哪些？",
+    "route": "vector",
+    "risk_level": "low",
+    "final_answer": "结论：当前证据还不足以支撑强结论，只能给出保守摘要。\n关键证据：\n- [milvus] 问题编号：Q2025-001；现象：液压泵泄漏；部件：液压泵、密封圈；原因：密封圈老化；措施：更换密封圈、复测验证 (score=0.320)\n- [milvus] 问题编号：Q2025-001；现象：液压泵泄漏；部件：液压泵、密封圈；原因：密封圈老化；措施：更换密封圈、复测验证 (score=0.320)\n- [milvus] 问题编号：Q2025-001；现象：液压泵泄漏；部件：液压泵、密封圈；原因：密封圈老化；措施：更换密封圈、复测验证 (score=0.320)\n建议动作：补充历史案例、图关系路径或更精准的问题约束后再检索。",
+    "created_at": "2026-03-10T10:28:52.174142",
+    "evidence_ids": [
+      "chunk_b49892775b57",
+      "chunk_f8354d6fead4",
+      "chunk_5c781e0a5f49",
+      "chunk_23bf50042b77",
+      "chunk_9a15405ccd9a"
+    ],
+    "fallback_mode": "summary_only"
+  },
+  {
+    "trace_id": "trace_de31bbcb593a",
+    "user_id": "u001",
+    "question": "液压泵泄漏的原因有哪些？",
+    "route": "vector",
+    "risk_level": "low",
+    "final_answer": "结论：当前证据还不足以支撑强结论，只能给出保守摘要。\n关键证据：\n- [milvus] 问题编号：Q2025-001；现象：液压泵泄漏；部件：液压泵、密封圈；原因：密封圈老化；措施：更换密封圈、复测验证 (score=0.320)\n- [milvus] 问题编号：Q2025-001；现象：液压泵泄漏；部件：液压泵、密封圈；原因：密封圈老化；措施：更换密封圈、复测验证 (score=0.320)\n- [milvus] 问题编号：Q2025-001；现象：液压泵泄漏；部件：液压泵、密封圈；原因：密封圈老化；措施：更换密封圈、复测验证 (score=0.320)\n建议动作：补充历史案例、图关系路径或更精准的问题约束后再检索。",
+    "created_at": "2026-03-10T10:33:19.031295",
+    "evidence_ids": [
+      "chunk_b49892775b57",
+      "chunk_f8354d6fead4",
+      "chunk_5c781e0a5f49",
+      "chunk_23bf50042b77",
+      "chunk_9a15405ccd9a"
+    ],
+    "fallback_mode": "summary_only"
+  }
+]
