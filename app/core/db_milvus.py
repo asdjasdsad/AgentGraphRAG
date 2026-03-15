@@ -4,7 +4,8 @@ from collections.abc import Iterable
 from functools import lru_cache
 from typing import Any
 
-from pymilvus import MilvusClient
+from pymilvus import DataType, MilvusClient
+from pymilvus.exceptions import DataNotMatchException
 
 from app.core.config import Settings, get_settings
 from app.core.db_mysql import cases_table, chunks_table
@@ -14,6 +15,7 @@ from app.domain.schemas import CaseSummary, Chunk, Evidence
 
 DEFAULT_VECTOR_FIELD = "vector"
 DEFAULT_ID_FIELD = "id"
+DEFAULT_ID_MAX_LENGTH = 128
 DEFAULT_SEARCH_FIELDS = [
     "content",
     "document_id",
@@ -82,13 +84,10 @@ class MilvusStore:
         client = self._client()
         if client.has_collection(collection_name=collection_name):
             return
-        client.create_collection(
-            collection_name=collection_name,
-            dimension=settings.embedding_dimensions,
-            metric_type="IP",
-            auto_id=False,
-            enable_dynamic_field=True,
-        )
+        schema = client.create_schema(auto_id=False, enable_dynamic_field=True)
+        schema.add_field(DEFAULT_ID_FIELD, DataType.VARCHAR, is_primary=True, max_length=DEFAULT_ID_MAX_LENGTH)
+        schema.add_field(DEFAULT_VECTOR_FIELD, DataType.FLOAT_VECTOR, dim=settings.embedding_dimensions)
+        client.create_collection(collection_name=collection_name, schema=schema, metric_type="IP")
 
     def _mock_insert_chunks(self, chunks: list[Chunk]) -> None:
         embeddings = embed_documents([chunk.content for chunk in chunks]) if chunks else []
@@ -148,7 +147,13 @@ class MilvusStore:
             )
             chunks_table.upsert(chunk, "chunk_id")
         if rows:
-            self._client().upsert(collection_name=settings.milvus_collection, data=rows)
+            try:
+                self._client().upsert(collection_name=settings.milvus_collection, data=rows)
+            except DataNotMatchException as exc:
+                raise RuntimeError(
+                    f"Milvus collection '{settings.milvus_collection}' schema is incompatible with string IDs. "
+                    f"Recreate the collection with VARCHAR primary key '{DEFAULT_ID_FIELD}'."
+                ) from exc
 
     def insert_cases(self, cases: list[CaseSummary]) -> None:
         settings = self._settings()
@@ -172,7 +177,13 @@ class MilvusStore:
             )
             cases_table.upsert(case, "case_id")
         if rows:
-            self._client().upsert(collection_name=settings.milvus_case_collection, data=rows)
+            try:
+                self._client().upsert(collection_name=settings.milvus_case_collection, data=rows)
+            except DataNotMatchException as exc:
+                raise RuntimeError(
+                    f"Milvus collection '{settings.milvus_case_collection}' schema is incompatible with string IDs. "
+                    f"Recreate the collection with VARCHAR primary key '{DEFAULT_ID_FIELD}'."
+                ) from exc
 
     def search(self, query_text: str, metadata_filter: dict[str, Any] | None = None, top_k: int = 5) -> list[Evidence]:
         settings = self._settings()

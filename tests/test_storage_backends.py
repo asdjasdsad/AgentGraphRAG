@@ -26,6 +26,14 @@ def test_record_table_uses_sqlite_backend(monkeypatch, tmp_path) -> None:
 def test_milvus_store_calls_real_client(monkeypatch) -> None:
     requests: list[dict] = []
 
+    class FakeSchema:
+        def __init__(self, **kwargs) -> None:
+            self.kwargs = kwargs
+            self.fields: list[dict] = []
+
+        def add_field(self, name: str, dtype, **kwargs) -> None:
+            self.fields.append({"name": name, "dtype": dtype, **kwargs})
+
     class FakeMilvusClient:
         def __init__(self, **kwargs) -> None:
             requests.append({"kind": "init", "kwargs": kwargs})
@@ -33,6 +41,11 @@ def test_milvus_store_calls_real_client(monkeypatch) -> None:
         def has_collection(self, collection_name: str) -> bool:
             requests.append({"kind": "has_collection", "collection_name": collection_name})
             return False
+
+        def create_schema(self, **kwargs):
+            schema = FakeSchema(**kwargs)
+            requests.append({"kind": "create_schema", "kwargs": kwargs, "schema": schema})
+            return schema
 
         def create_collection(self, **kwargs) -> None:
             requests.append({"kind": "create_collection", "kwargs": kwargs})
@@ -68,10 +81,14 @@ def test_milvus_store_calls_real_client(monkeypatch) -> None:
         ]
     )
 
+    schema_request = next(item for item in requests if item["kind"] == "create_schema")
     create_request = next(item for item in requests if item["kind"] == "create_collection")
     upsert_request = next(item for item in requests if item["kind"] == "upsert")
+    assert schema_request["kwargs"] == {"auto_id": False, "enable_dynamic_field": True}
     assert create_request["kwargs"]["collection_name"] == "chunks"
-    assert create_request["kwargs"]["dimension"] == 256
+    assert create_request["kwargs"]["schema"].fields[0]["name"] == "id"
+    assert create_request["kwargs"]["schema"].fields[0]["is_primary"] is True
+    assert create_request["kwargs"]["schema"].fields[1]["dim"] == 256
     assert upsert_request["kwargs"]["data"][0]["id"] == "chunk_001"
 
 
