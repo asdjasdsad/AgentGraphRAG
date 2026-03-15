@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
 from functools import lru_cache
 from typing import Any
@@ -16,6 +17,9 @@ from app.domain.schemas import CaseSummary, Chunk, Evidence
 DEFAULT_VECTOR_FIELD = "vector"
 DEFAULT_ID_FIELD = "id"
 DEFAULT_ID_MAX_LENGTH = 128
+logger = logging.getLogger(__name__)
+
+
 DEFAULT_SEARCH_FIELDS = [
     "content",
     "document_id",
@@ -41,6 +45,17 @@ def _normalize_datatype_name(value: Any) -> str:
     if "." in text:
         text = text.rsplit(".", 1)[-1]
     return text
+
+
+class MilvusSchemaMismatchError(RuntimeError):
+    def __init__(self, collection_name: str, field_name: str, data_type: str) -> None:
+        self.collection_name = collection_name
+        self.field_name = field_name
+        self.data_type = data_type
+        super().__init__(
+            f"Milvus collection '{collection_name}' schema is incompatible: "
+            f"primary field is '{field_name}' ({data_type}), expected '{DEFAULT_ID_FIELD}' (VARCHAR)."
+        )
 
 
 def reset_milvus_clients() -> None:
@@ -128,16 +143,27 @@ class MilvusStore:
         field_name = str(primary_field.get("name") or primary_field.get("field_name") or "UNKNOWN")
         data_type = _normalize_datatype_name(primary_field.get("type") or primary_field.get("data_type"))
         if field_name != DEFAULT_ID_FIELD or data_type != "VARCHAR":
-            raise RuntimeError(
-                f"Milvus collection '{collection_name}' schema is incompatible: "
-                f"primary field is '{field_name}' ({data_type}), expected '{DEFAULT_ID_FIELD}' (VARCHAR). "
-                "Recreate the collection before ingestion."
-            )
+            raise MilvusSchemaMismatchError(collection_name, field_name, data_type)
+
+    def _handle_schema_mismatch(self, collection_name: str, exc: MilvusSchemaMismatchError) -> None:
+        settings = self._settings()
+        if not settings.milvus_auto_recreate_on_schema_mismatch:
+            raise RuntimeError(f"{exc} Recreate the collection before ingestion.") from exc
+        logger.warning(
+            "Recreating Milvus collection '%s' because schema is incompatible: primary field '%s' (%s)",
+            collection_name,
+            exc.field_name,
+            exc.data_type,
+        )
+        self.recreate_collection(collection_name)
 
     def _ensure_collection(self, collection_name: str) -> None:
         client = self._client()
         if client.has_collection(collection_name=collection_name):
-            self._validate_collection_schema(collection_name)
+            try:
+                self._validate_collection_schema(collection_name)
+            except MilvusSchemaMismatchError as exc:
+                self._handle_schema_mismatch(collection_name, exc)
             return
         client.create_collection(collection_name=collection_name, schema=self._build_schema(), metric_type="IP")
 
@@ -208,10 +234,14 @@ class MilvusStore:
             try:
                 self._client().upsert(collection_name=settings.milvus_collection, data=rows)
             except DataNotMatchException as exc:
-                self._validate_collection_schema(settings.milvus_collection)
+                try:
+                    self._validate_collection_schema(settings.milvus_collection)
+                except MilvusSchemaMismatchError as mismatch:
+                    self._handle_schema_mismatch(settings.milvus_collection, mismatch)
+                    self._client().upsert(collection_name=settings.milvus_collection, data=rows)
+                    return
                 raise RuntimeError(
-                    f"Milvus collection '{settings.milvus_collection}' schema is incompatible with string IDs. "
-                    f"Recreate the collection with VARCHAR primary key '{DEFAULT_ID_FIELD}'."
+                    f"Milvus collection '{settings.milvus_collection}' rejected chunk rows: {exc}"
                 ) from exc
 
     def insert_cases(self, cases: list[CaseSummary]) -> None:
@@ -239,10 +269,14 @@ class MilvusStore:
             try:
                 self._client().upsert(collection_name=settings.milvus_case_collection, data=rows)
             except DataNotMatchException as exc:
-                self._validate_collection_schema(settings.milvus_case_collection)
+                try:
+                    self._validate_collection_schema(settings.milvus_case_collection)
+                except MilvusSchemaMismatchError as mismatch:
+                    self._handle_schema_mismatch(settings.milvus_case_collection, mismatch)
+                    self._client().upsert(collection_name=settings.milvus_case_collection, data=rows)
+                    return
                 raise RuntimeError(
-                    f"Milvus collection '{settings.milvus_case_collection}' schema is incompatible with string IDs. "
-                    f"Recreate the collection with VARCHAR primary key '{DEFAULT_ID_FIELD}'."
+                    f"Milvus collection '{settings.milvus_case_collection}' rejected case rows: {exc}"
                 ) from exc
 
     def search(self, query_text: str, metadata_filter: dict[str, Any] | None = None, top_k: int = 5) -> list[Evidence]:

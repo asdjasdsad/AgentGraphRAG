@@ -74,6 +74,7 @@ class Settings(BaseSettings):
     milvus_database: str = "default"
     milvus_collection: str = "knowledge_chunks"
     milvus_case_collection: str = "case_memory"
+    milvus_auto_recreate_on_schema_mismatch: bool = True
 
     default_top_k: int = 5
     max_chunk_chars: int = 500
