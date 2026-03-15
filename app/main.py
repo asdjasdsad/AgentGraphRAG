@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
@@ -7,8 +7,11 @@ from app.api.routes_audit import router as audit_router
 from app.api.routes_cases import router as cases_router
 from app.api.routes_documents import router as documents_router
 from app.api.routes_ingestion import router as ingestion_router
+from app.api.routes_knowledge import router as knowledge_router
+from app.api.routes_prompts import router as prompts_router
 from app.api.routes_qa import router as qa_router
 from app.api.routes_settings import router as settings_router
+from app.api.routes_workspace import router as workspace_router
 from app.core.config import get_settings
 from app.core.db_milvus import milvus_store
 from app.core.db_mysql import documents_table
@@ -27,11 +30,14 @@ def create_app() -> FastAPI:
     app.include_router(qa_router, prefix=settings.api_prefix)
     app.include_router(cases_router, prefix=settings.api_prefix)
     app.include_router(audit_router, prefix=settings.api_prefix)
+    app.include_router(knowledge_router, prefix=settings.api_prefix)
+    app.include_router(prompts_router, prefix=settings.api_prefix)
     app.include_router(settings_router)
+    app.include_router(workspace_router)
 
     @app.get("/", include_in_schema=False)
     def root() -> RedirectResponse:
-        return RedirectResponse(url="/settings", status_code=307)
+        return RedirectResponse(url="/workspace", status_code=307)
 
     @app.get("/health")
     def health() -> dict:

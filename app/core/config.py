@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
@@ -29,10 +29,24 @@ class Settings(BaseSettings):
     store_dir: Path = BASE_DIR / "data" / "store"
 
     llm_provider: str = ""
-    llm_model: str = ""
     llm_base_url: str = ""
     llm_api_key: str = ""
     llm_api_version: str = ""
+    llm_timeout_seconds: int = 60
+
+    answer_llm_model: str = ""
+    answer_llm_base_url: str = ""
+    answer_llm_api_key: str = ""
+    answer_llm_api_version: str = ""
+    answer_llm_temperature: float = 0.2
+    answer_llm_max_tokens: int = 1024
+
+    reasoning_llm_model: str = ""
+    reasoning_llm_base_url: str = ""
+    reasoning_llm_api_key: str = ""
+    reasoning_llm_api_version: str = ""
+    reasoning_llm_temperature: float = 0.0
+    reasoning_llm_max_tokens: int = 768
 
     embedding_provider: str = "local"
     embedding_model: str = "bge-m3"
@@ -58,10 +72,12 @@ class Settings(BaseSettings):
     milvus_uri: str = "http://localhost:19530"
     milvus_token: str = ""
     milvus_database: str = "default"
-    milvus_collection: str = "chunks"
+    milvus_collection: str = "knowledge_chunks"
+    milvus_case_collection: str = "case_memory"
 
     default_top_k: int = 5
     max_chunk_chars: int = 500
+    max_graph_hops: int = 3
 
 
 @lru_cache

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import re
 
@@ -29,21 +29,17 @@ def extract_entities_relations(text: str, doc_type: str) -> dict:
     entities.extend(_extract_by_hints(text, PHENOMENON_HINTS, "Phenomenon"))
     entities.extend(_extract_by_hints(text, CAUSE_HINTS, "Cause"))
     entities.extend(_extract_by_hints(text, ACTION_HINTS, "Action"))
-
     matched_issue = re.search(r"Q\d{4}-\d{3,}", text)
     if matched_issue:
         entities.append(Entity(name=matched_issue.group(0), type="Issue"))
-
     deduped = {(entity.name, entity.type): entity for entity in entities}
     entities = list(deduped.values())
-
     relations: list[Relation] = []
     causes = [entity.name for entity in entities if entity.type == "Cause"]
     phenomena = [entity.name for entity in entities if entity.type == "Phenomenon"]
     actions = [entity.name for entity in entities if entity.type == "Action"]
     components = [entity.name for entity in entities if entity.type == "Component"]
     issues = [entity.name for entity in entities if entity.type == "Issue"]
-
     for cause in causes:
         for phenomenon in phenomena:
             relations.append(Relation(source=cause, type=RELATION_TYPES["causes"], target=phenomenon))
@@ -57,7 +53,6 @@ def extract_entities_relations(text: str, doc_type: str) -> dict:
             relations.append(Relation(source=issue, type=RELATION_TYPES["involves_component"], target=component))
         for action in actions:
             relations.append(Relation(source=issue, type=RELATION_TYPES["has_action"], target=action))
-
     result = ExtractionResult(entities=entities, relations=relations).model_dump(mode="json")
     result["prompt_blueprint_length"] = len(prompt_blueprint)
     return result

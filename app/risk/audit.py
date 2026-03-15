@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from app.core.db_mysql import audit_logs_table
 from app.domain.schemas import AuditLog, QAState
@@ -14,5 +14,8 @@ def write_audit_log(state: QAState) -> dict:
         final_answer=state.final_answer,
         evidence_ids=[item.evidence_id for item in state.reranked_evidence[:5]],
         fallback_mode=state.fallback_mode,
+        agent_traces=state.agent_traces,
+        reasoning_path=state.reasoning_path,
+        answer_payload=state.answer_payload,
     )
     return audit_logs_table.upsert(log, "trace_id")

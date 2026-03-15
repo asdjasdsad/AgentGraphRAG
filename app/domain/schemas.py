@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
@@ -125,6 +125,7 @@ class QueryPlan(BaseModel):
     cypher_params: dict[str, Any] = Field(default_factory=dict)
     metadata_filter: dict[str, Any] = Field(default_factory=dict)
     top_k: int = 5
+    max_hops: int = 2
 
 
 class Evidence(BaseModel):
@@ -146,16 +147,20 @@ class QAState(BaseModel):
     constraints: list[str] = Field(default_factory=list)
     analysis_notes: list[str] = Field(default_factory=list)
     need_multihop: bool = False
+    retrieval_strategy_hint: str | None = None
     retrieval_strategy: RetrievalStrategy = RetrievalStrategy.VECTOR
     route_reason: str = ""
     route_notes: list[str] = Field(default_factory=list)
+    retrieval_notes: list[str] = Field(default_factory=list)
     risk_level: RiskLevel = RiskLevel.LOW
     allowed_scope: list[str] = Field(default_factory=list)
     query_plan: QueryPlan | None = None
     vector_hits: list[Evidence] = Field(default_factory=list)
     graph_hits: list[Evidence] = Field(default_factory=list)
+    case_hits: list[Evidence] = Field(default_factory=list)
     retrieved_evidence: list[Evidence] = Field(default_factory=list)
     reranked_evidence: list[Evidence] = Field(default_factory=list)
+    agent_traces: list[dict[str, Any]] = Field(default_factory=list)
     reasoning_path: list[dict[str, Any]] = Field(default_factory=list)
     is_sufficient: bool = False
     conflict_detected: bool = False
@@ -194,3 +199,6 @@ class AuditLog(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     evidence_ids: list[str] = Field(default_factory=list)
     fallback_mode: str = "none"
+    agent_traces: list[dict[str, Any]] = Field(default_factory=list)
+    reasoning_path: list[dict[str, Any]] = Field(default_factory=list)
+    answer_payload: dict[str, Any] = Field(default_factory=dict)

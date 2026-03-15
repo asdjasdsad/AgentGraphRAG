@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import re
@@ -60,13 +60,12 @@ def _render_path(path: Any) -> tuple[str, dict[str, Any]]:
         segments.append(node_data.get("name", str(node.id)))
         if index < len(relationships):
             relation = relationships[index]
-            relation_type = relation.type
             relation_data = dict(relation)
-            relation_data["type"] = relation_type
+            relation_data["type"] = relation.type
             relation_data["start_node"] = relation.start_node.get("name")
             relation_data["end_node"] = relation.end_node.get("name")
             metadata["relationships"].append(relation_data)
-            segments.append(f"-[{relation_type}]->")
+            segments.append(f"-[{relation.type}]->")
     return " ".join(segments), metadata
 
 
@@ -109,16 +108,8 @@ class GraphStore:
                 continue
             if entity_names and relation["source"] not in entity_names and relation["target"] not in entity_names:
                 continue
-            content = f'{relation["source"]} -[{relation["type"]}]-> {relation["target"]}'
-            hits.append(
-                Evidence(
-                    evidence_id=f'graph_{relation["source"]}_{relation["target"]}',
-                    source="neo4j",
-                    content=content,
-                    score=1.0 / max_hops,
-                    metadata=relation,
-                )
-            )
+            content = f"{relation['source']} -[{relation['type']}]-> {relation['target']}"
+            hits.append(Evidence(evidence_id=f"graph_{relation['source']}_{relation['target']}", source="neo4j", content=content, score=1.0 / max(1, max_hops), metadata=relation))
         return hits
 
     def upsert_graph(self, entities: list[Entity], relations: list[Relation]) -> None:
@@ -126,7 +117,6 @@ class GraphStore:
         if _is_test_mode(settings):
             self._mock_upsert_graph(entities, relations)
             return
-
         driver = self._driver()
         entity_types = {entity.name: entity.type for entity in entities}
         with driver.session(database=settings.neo4j_database) as session:
@@ -134,56 +124,47 @@ class GraphStore:
                 label = _validate_cypher_name(entity.type, "label")
                 properties = _sanitize_properties(entity.attributes)
                 properties["name"] = entity.name
-                session.run(
-                    f"MERGE (n:{label} {{name: $name}}) SET n += $props",
-                    name=entity.name,
-                    props=properties,
-                )
+                session.run(f"MERGE (n:{label} {{name: $name}}) SET n += $props", name=entity.name, props=properties)
             for relation in relations:
                 relation_name = _validate_cypher_name(relation.type, "relationship type")
                 source_label = _validate_cypher_name(entity_types.get(relation.source, "Entity"), "label")
                 target_label = _validate_cypher_name(entity_types.get(relation.target, "Entity"), "label")
-                session.run(
-                    (
-                        f"MATCH (a:{source_label} {{name: $source_name}}), (b:{target_label} {{name: $target_name}}) "
-                        f"MERGE (a)-[r:{relation_name}]->(b) "
-                        "SET r += $props"
-                    ),
-                    source_name=relation.source,
-                    target_name=relation.target,
-                    props=_sanitize_properties(relation.attributes),
-                )
+                session.run((f"MATCH (a:{source_label} {{name: $source_name}}), (b:{target_label} {{name: $target_name}}) " f"MERGE (a)-[r:{relation_name}]->(b) SET r += $props"), source_name=relation.source, target_name=relation.target, props=_sanitize_properties(relation.attributes))
 
     def query(self, entity_names: list[str], relation_type: str | None = None, max_hops: int = 2) -> list[Evidence]:
         settings = self._settings()
         if _is_test_mode(settings):
             return self._mock_query(entity_names, relation_type=relation_type, max_hops=max_hops)
-
-        relation_pattern = ""
-        if relation_type:
-            relation_name = _validate_cypher_name(relation_type, "relationship type")
-            relation_pattern = f":{relation_name}"
-        query = (
-            f"MATCH path = (a)-[{relation_pattern}*1..{max_hops}]-(b) "
-            "WHERE size($entity_names) = 0 OR a.name IN $entity_names OR b.name IN $entity_names "
-            "RETURN path LIMIT $limit"
-        )
+        relation_pattern = f":{_validate_cypher_name(relation_type, 'relationship type')}" if relation_type else ""
+        query = f"MATCH path = (a)-[{relation_pattern}*1..{max_hops}]-(b) WHERE size($entity_names) = 0 OR a.name IN $entity_names OR b.name IN $entity_names RETURN path LIMIT $limit"
         hits: list[Evidence] = []
         with self._driver().session(database=settings.neo4j_database) as session:
             result = session.run(query, entity_names=entity_names, limit=20)
             for index, record in enumerate(result):
                 content, metadata = _render_path(record["path"])
                 hop_count = max(1, len(metadata["relationships"]))
-                hits.append(
-                    Evidence(
-                        evidence_id=f"graph_path_{index}",
-                        source="neo4j",
-                        content=content,
-                        score=1.0 / hop_count,
-                        metadata=metadata,
-                    )
-                )
+                hits.append(Evidence(evidence_id=f"graph_path_{index}", source="neo4j", content=content, score=1.0 / hop_count, metadata=metadata))
         return hits
+
+    def snapshot(self, limit: int = 200) -> dict[str, Any]:
+        settings = self._settings()
+        if _is_test_mode(settings):
+            data = self._read()
+            return {"entities": data["entities"][:limit], "relations": data["relations"][:limit], "counts": {"entities": len(data["entities"]), "relations": len(data["relations"])}}
+        try:
+            entities: list[dict[str, Any]] = []
+            relations: list[dict[str, Any]] = []
+            with self._driver().session(database=settings.neo4j_database) as session:
+                entity_result = session.run("MATCH (n) RETURN n.name AS name, labels(n) AS labels LIMIT $limit", limit=limit)
+                for row in entity_result:
+                    labels = row.get("labels") or []
+                    entities.append({"name": row.get("name", ""), "type": labels[0] if labels else "Entity"})
+                relation_result = session.run("MATCH (a)-[r]->(b) RETURN a.name AS source, type(r) AS type, b.name AS target LIMIT $limit", limit=limit)
+                for row in relation_result:
+                    relations.append({"source": row.get("source", ""), "type": row.get("type", ""), "target": row.get("target", "")})
+            return {"entities": entities, "relations": relations, "counts": {"entities": len(entities), "relations": len(relations)}}
+        except Exception as exc:
+            return {"entities": [], "relations": [], "counts": {"entities": 0, "relations": 0}, "error": str(exc)}
 
     def ping(self) -> dict[str, Any]:
         settings = self._settings()
@@ -193,13 +174,8 @@ class GraphStore:
             driver = self._driver()
             driver.verify_connectivity()
             return {"ok": True, "backend": settings.neo4j_uri, "database": settings.neo4j_database}
-        except Exception as exc:  # pragma: no cover - exercised in app runtime
-            return {
-                "ok": False,
-                "backend": settings.neo4j_uri,
-                "database": settings.neo4j_database,
-                "error": str(exc),
-            }
+        except Exception as exc:
+            return {"ok": False, "backend": settings.neo4j_uri, "database": settings.neo4j_database, "error": str(exc)}
 
 
 graph_store = GraphStore()

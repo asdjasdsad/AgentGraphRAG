@@ -1,8 +1,8 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from app.core.db_mysql import chunks_table
 from app.domain.enums import ChunkType, DocumentType
-from app.domain.schemas import Chunk, StructuredRecord
+from app.domain.schemas import Chunk
 from app.offline.extraction import extract_entities_relations
 from app.offline.loaders.milvus_loader import load_chunks_to_milvus
 from app.offline.loaders.neo4j_loader import load_graph_data
@@ -20,18 +20,7 @@ def ingest_structured_records(records: list[dict], load_batch_id: str | None = N
             f"部件：{'、'.join(record.component)}；原因：{'、'.join(record.cause)}；"
             f"措施：{'、'.join(record.action)}"
         )
-        chunk = Chunk(
-            document_id=record.issue_id,
-            doc_type=DocumentType.ISSUE_RECORD,
-            chunk_type=ChunkType.GENERAL,
-            section_path="structured_record",
-            content=text,
-            issue_id=record.issue_id,
-            component=record.component,
-            source_type="structured",
-            load_batch_id=load_batch_id,
-            metadata=record.model_dump(mode="json"),
-        )
+        chunk = Chunk(document_id=record.issue_id, doc_type=DocumentType.ISSUE_RECORD, chunk_type=ChunkType.GENERAL, section_path="structured_record", content=text, issue_id=record.issue_id, component=record.component, source_type="structured", load_batch_id=load_batch_id, metadata=record.model_dump(mode="json"))
         chunks.append(chunk)
         extraction = extract_entities_relations(text, "issue_record")
         entities.extend(extraction["entities"])

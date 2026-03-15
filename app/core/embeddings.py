@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import hashlib
 import math
@@ -13,6 +13,7 @@ from app.core.config import Settings, get_settings
 DEFAULT_DASHSCOPE_EMBEDDING_URL = "https://dashscope.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding"
 DEFAULT_EMBEDDING_TIMEOUT = 30.0
 DEFAULT_BATCH_SIZE = 8
+OPENAI_COMPATIBLE_EMBEDDING_PROVIDERS = {"openai", "azure-openai", "openai-compatible", "ollama"}
 
 
 class EmbeddingProviderError(RuntimeError):
@@ -36,7 +37,6 @@ def _local_embed(text: str, dimensions: int) -> list[float]:
     raw = text.encode("utf-8")
     if not raw:
         return buckets
-
     digest = hashlib.sha256(raw).digest()
     for index, value in enumerate(raw):
         bucket = (value + digest[index % len(digest)] + index * 31) % size
@@ -68,12 +68,12 @@ class OpenAICompatibleEmbeddingProvider:
         return f"{base_url.rstrip('/')}/embeddings"
 
     def _headers(self) -> dict[str, str]:
-        if not self.settings.embedding_api_key:
-            raise EmbeddingProviderError("embedding_api_key is required for OpenAI-compatible embeddings")
+        if not self.settings.embedding_api_key and self.settings.embedding_provider != "ollama":
+            raise EmbeddingProviderError("embedding_api_key is required for this embedding provider")
         headers = {"Content-Type": "application/json"}
         if self.settings.embedding_provider == "azure-openai":
             headers["api-key"] = self.settings.embedding_api_key
-        else:
+        elif self.settings.embedding_api_key:
             headers["Authorization"] = f"Bearer {self.settings.embedding_api_key}"
         return headers
 
@@ -83,7 +83,6 @@ class OpenAICompatibleEmbeddingProvider:
             response = client.post(self._endpoint(), headers=self._headers(), json=payload)
         if response.status_code >= 400:
             raise EmbeddingProviderError(f"Embedding request failed with status {response.status_code}: {response.text}")
-
         data = response.json()
         embeddings = sorted(data.get("data", []), key=lambda item: item.get("index", 0))
         if len(embeddings) != len(inputs):
@@ -117,31 +116,22 @@ class DashScopeEmbeddingProvider:
             "Content-Type": "application/json",
         }
 
-    def _parameters(self, text_type: str, instruct: str | None = None) -> dict[str, Any]:
-        parameters: dict[str, Any] = {
-            "text_type": text_type,
-            "dimension": self.settings.embedding_dimensions,
-        }
-        if instruct and text_type == "query":
-            parameters["instruct"] = instruct
-        return parameters
-
     def _post(self, inputs: Sequence[str], *, text_type: str, instruct: str | None = None) -> list[list[float]]:
         payload = {
             "model": self.settings.embedding_model,
             "input": {"texts": list(inputs)},
-            "parameters": self._parameters(text_type=text_type, instruct=instruct),
+            "parameters": {
+                "text_type": text_type,
+                "dimension": self.settings.embedding_dimensions,
+                **({"instruct": instruct} if instruct and text_type == "query" else {}),
+            },
         }
         with httpx.Client(timeout=DEFAULT_EMBEDDING_TIMEOUT) as client:
             response = client.post(self._endpoint(), headers=self._headers(), json=payload)
         if response.status_code >= 400:
             raise EmbeddingProviderError(f"DashScope embedding request failed with status {response.status_code}: {response.text}")
-
         data = response.json()
-        embeddings = sorted(
-            data.get("output", {}).get("embeddings", []),
-            key=lambda item: item.get("text_index", 0),
-        )
+        embeddings = sorted(data.get("output", {}).get("embeddings", []), key=lambda item: item.get("text_index", 0))
         if len(embeddings) != len(inputs):
             raise EmbeddingProviderError("DashScope embedding response size does not match request size")
         return [_normalize(item.get("embedding", [])) for item in embeddings]
@@ -162,11 +152,13 @@ class DashScopeEmbeddingProvider:
 def build_embedding_provider(settings: Settings | None = None) -> LocalEmbeddingProvider | OpenAICompatibleEmbeddingProvider | DashScopeEmbeddingProvider:
     settings = settings or get_settings()
     provider = settings.embedding_provider.strip().lower()
-    if provider == "local":
-        return LocalEmbeddingProvider(settings)
     if provider == "dashscope":
         return DashScopeEmbeddingProvider(settings)
-    if provider in {"openai", "azure-openai", "openai-compatible"}:
+    if provider in OPENAI_COMPATIBLE_EMBEDDING_PROVIDERS and settings.embedding_base_url.strip():
+        return OpenAICompatibleEmbeddingProvider(settings)
+    if provider in {"local", "ollama"}:
+        return LocalEmbeddingProvider(settings)
+    if provider in OPENAI_COMPATIBLE_EMBEDDING_PROVIDERS:
         return OpenAICompatibleEmbeddingProvider(settings)
     raise EmbeddingProviderError(f"Unsupported embedding provider: {settings.embedding_provider}")
 

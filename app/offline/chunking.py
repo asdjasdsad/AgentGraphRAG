@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from app.core.config import get_settings
 from app.domain.enums import ChunkType, DocumentType
@@ -44,44 +44,18 @@ def build_chunks(parsed_doc: ParsedDocument) -> list[Chunk]:
         for record in parsed_doc.records:
             content = clean_text(
                 f"问题编号：{record.get('issue_id', '')}；现象：{record.get('phenomenon', '')}；"
-                f"部件：{'、'.join(record.get('component', []))}；"
-                f"原因：{'、'.join(record.get('cause', []))}；"
+                f"部件：{'、'.join(record.get('component', []))}；原因：{'、'.join(record.get('cause', []))}；"
                 f"措施：{'、'.join(record.get('action', []))}"
             )
-            chunks.append(
-                Chunk(
-                    document_id=parsed_doc.document_id,
-                    doc_type=parsed_doc.doc_type,
-                    chunk_type=ChunkType.GENERAL,
-                    section_path="issue_record",
-                    content=content,
-                    issue_id=record.get("issue_id"),
-                    component=record.get("component", []),
-                    metadata={"record": record},
-                )
-            )
+            chunks.append(Chunk(document_id=parsed_doc.document_id, doc_type=parsed_doc.doc_type, chunk_type=ChunkType.GENERAL, section_path="issue_record", content=content, issue_id=record.get("issue_id"), component=record.get("component", []), metadata={"record": record}))
         return chunks
-
     sections = parsed_doc.sections or []
     if parsed_doc.steps:
-        sections = [
-            {"section_path": f"step_{step.step_no}", "content": step.content, "page_no": 1}
-            for step in parsed_doc.steps
-        ]
+        sections = [{"section_path": f"step_{step.step_no}", "content": step.content, "page_no": 1} for step in parsed_doc.steps]
     for section in sections:
         section_path = section.section_path if hasattr(section, "section_path") else section["section_path"]
         content = section.content if hasattr(section, "content") else section["content"]
         page_no = section.page_no if hasattr(section, "page_no") else section.get("page_no")
         for piece in _split_long_text(clean_text(content)):
-            chunks.append(
-                Chunk(
-                    document_id=parsed_doc.document_id,
-                    doc_type=parsed_doc.doc_type,
-                    chunk_type=_guess_chunk_type(section_path, piece),
-                    section_path=section_path,
-                    content=piece,
-                    page_no=page_no,
-                    metadata={"file_name": parsed_doc.file_name},
-                )
-            )
+            chunks.append(Chunk(document_id=parsed_doc.document_id, doc_type=parsed_doc.doc_type, chunk_type=_guess_chunk_type(section_path, piece), section_path=section_path, content=piece, page_no=page_no, metadata={"file_name": parsed_doc.file_name}))
     return chunks

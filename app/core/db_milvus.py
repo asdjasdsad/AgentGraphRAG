@@ -1,6 +1,5 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
-import math
 from collections.abc import Iterable
 from functools import lru_cache
 from typing import Any
@@ -8,9 +7,9 @@ from typing import Any
 from pymilvus import MilvusClient
 
 from app.core.config import Settings, get_settings
-from app.core.db_mysql import chunks_table
+from app.core.db_mysql import cases_table, chunks_table
 from app.core.embeddings import embed_documents, embed_query
-from app.domain.schemas import Chunk, Evidence
+from app.domain.schemas import CaseSummary, Chunk, Evidence
 
 
 DEFAULT_VECTOR_FIELD = "vector"
@@ -25,6 +24,8 @@ DEFAULT_SEARCH_FIELDS = [
     "issue_id",
     "source_type",
     "load_batch_id",
+    "summary",
+    "issue_type",
 ]
 
 
@@ -76,24 +77,18 @@ class MilvusStore:
         settings = self._settings()
         return get_milvus_client(settings.milvus_uri, settings.milvus_token, settings.milvus_database)
 
-    def _ensure_collection(self) -> None:
+    def _ensure_collection(self, collection_name: str) -> None:
         settings = self._settings()
         client = self._client()
-        if client.has_collection(collection_name=settings.milvus_collection):
+        if client.has_collection(collection_name=collection_name):
             return
         client.create_collection(
-            collection_name=settings.milvus_collection,
+            collection_name=collection_name,
             dimension=settings.embedding_dimensions,
             metric_type="IP",
             auto_id=False,
             enable_dynamic_field=True,
         )
-
-    def _upsert_metadata(self, chunks: list[Chunk]) -> None:
-        for chunk in chunks:
-            payload = chunk.model_dump(mode="json")
-            payload.pop("embedding", None)
-            chunks_table.upsert(payload, "chunk_id")
 
     def _mock_insert_chunks(self, chunks: list[Chunk]) -> None:
         embeddings = embed_documents([chunk.content for chunk in chunks]) if chunks else []
@@ -102,23 +97,29 @@ class MilvusStore:
             payload["embedding"] = embedding
             chunks_table.upsert(payload, "chunk_id")
 
-    def _mock_search(self, query_text: str, metadata_filter: dict[str, Any] | None = None, top_k: int = 5) -> list[Evidence]:
+    def _mock_insert_cases(self, cases: list[CaseSummary]) -> None:
+        embeddings = embed_documents([case.summary for case in cases]) if cases else []
+        for case, embedding in zip(cases, embeddings):
+            payload = case.model_dump(mode="json")
+            payload["embedding"] = embedding
+            cases_table.upsert(payload, "case_id")
+
+    def _mock_search_chunks(self, query_text: str, metadata_filter: dict[str, Any] | None, top_k: int) -> list[Evidence]:
         query_embedding = embed_query(query_text)
-        metadata_filter = metadata_filter or {}
         hits: list[Evidence] = []
         for row in chunks_table.all():
-            if any(row.get(key) != value for key, value in metadata_filter.items()):
+            if metadata_filter and any(row.get(key) != value for key, value in metadata_filter.items()):
                 continue
             score = _cosine(query_embedding, row.get("embedding", []))
-            hits.append(
-                Evidence(
-                    evidence_id=row["chunk_id"],
-                    source="milvus",
-                    content=row["content"],
-                    score=score,
-                    metadata=row,
-                )
-            )
+            hits.append(Evidence(evidence_id=row["chunk_id"], source="milvus", content=row.get("content", ""), score=score, metadata=row))
+        return sorted(hits, key=lambda item: item.score, reverse=True)[:top_k]
+
+    def _mock_search_cases(self, query_text: str, top_k: int) -> list[Evidence]:
+        query_embedding = embed_query(query_text)
+        hits: list[Evidence] = []
+        for row in cases_table.all():
+            score = _cosine(query_embedding, row.get("embedding", []))
+            hits.append(Evidence(evidence_id=row["case_id"], source="case_memory", content=row.get("summary", ""), score=score, metadata=row))
         return sorted(hits, key=lambda item: item.score, reverse=True)[:top_k]
 
     def insert_chunks(self, chunks: list[Chunk]) -> None:
@@ -126,8 +127,7 @@ class MilvusStore:
         if _is_test_mode(settings):
             self._mock_insert_chunks(chunks)
             return
-
-        self._ensure_collection()
+        self._ensure_collection(settings.milvus_collection)
         embeddings = embed_documents([chunk.content for chunk in chunks]) if chunks else []
         rows = []
         for chunk, embedding in zip(chunks, embeddings):
@@ -146,17 +146,40 @@ class MilvusStore:
                     "load_batch_id": chunk.load_batch_id,
                 }
             )
+            chunks_table.upsert(chunk, "chunk_id")
         if rows:
             self._client().upsert(collection_name=settings.milvus_collection, data=rows)
-        self._upsert_metadata(chunks)
+
+    def insert_cases(self, cases: list[CaseSummary]) -> None:
+        settings = self._settings()
+        if _is_test_mode(settings):
+            self._mock_insert_cases(cases)
+            return
+        self._ensure_collection(settings.milvus_case_collection)
+        embeddings = embed_documents([case.summary for case in cases]) if cases else []
+        rows = []
+        for case, embedding in zip(cases, embeddings):
+            rows.append(
+                {
+                    DEFAULT_ID_FIELD: case.case_id,
+                    DEFAULT_VECTOR_FIELD: embedding,
+                    "summary": case.summary,
+                    "issue_type": case.issue_type,
+                    "root_cause_chain_json": case.root_cause_chain_json,
+                    "actions_json": case.actions_json,
+                    "source_docs_json": case.source_docs_json,
+                }
+            )
+            cases_table.upsert(case, "case_id")
+        if rows:
+            self._client().upsert(collection_name=settings.milvus_case_collection, data=rows)
 
     def search(self, query_text: str, metadata_filter: dict[str, Any] | None = None, top_k: int = 5) -> list[Evidence]:
         settings = self._settings()
         metadata_filter = metadata_filter or {}
         if _is_test_mode(settings):
-            return self._mock_search(query_text, metadata_filter, top_k)
-
-        self._ensure_collection()
+            return self._mock_search_chunks(query_text, metadata_filter, top_k)
+        self._ensure_collection(settings.milvus_collection)
         query_embedding = embed_query(query_text)
         expression = _build_filter_expression(metadata_filter)
         raw_hits = self._client().search(
@@ -174,32 +197,43 @@ class MilvusStore:
                 mysql_row = chunks_table.get(chunk_id=chunk_id) if chunk_id else None
                 metadata = dict(mysql_row or {})
                 metadata.update(entity)
-                hits.append(
-                    Evidence(
-                        evidence_id=chunk_id or f"milvus_{len(hits)}",
-                        source="milvus",
-                        content=entity.get("content", metadata.get("content", "")),
-                        score=float(item.get("distance", 0.0)),
-                        metadata=metadata,
-                    )
-                )
+                hits.append(Evidence(evidence_id=chunk_id or f"milvus_{len(hits)}", source="milvus", content=entity.get("content", metadata.get("content", "")), score=float(item.get("distance", 0.0)), metadata=metadata))
+        return hits
+
+    def search_cases(self, query_text: str, top_k: int = 5) -> list[Evidence]:
+        settings = self._settings()
+        if _is_test_mode(settings):
+            return self._mock_search_cases(query_text, top_k)
+        self._ensure_collection(settings.milvus_case_collection)
+        query_embedding = embed_query(query_text)
+        raw_hits = self._client().search(
+            collection_name=settings.milvus_case_collection,
+            data=[query_embedding],
+            limit=top_k,
+            output_fields=DEFAULT_SEARCH_FIELDS,
+        )
+        hits: list[Evidence] = []
+        for group in raw_hits:
+            for item in group:
+                entity = item.get("entity", {})
+                case_id = item.get(DEFAULT_ID_FIELD) or entity.get(DEFAULT_ID_FIELD)
+                mysql_row = cases_table.get(case_id=case_id) if case_id else None
+                metadata = dict(mysql_row or {})
+                metadata.update(entity)
+                hits.append(Evidence(evidence_id=case_id or f"case_{len(hits)}", source="case_memory", content=entity.get("summary", metadata.get("summary", "")), score=float(item.get("distance", 0.0)), metadata=metadata))
         return hits
 
     def ping(self) -> dict[str, Any]:
         settings = self._settings()
         if _is_test_mode(settings):
-            return {"ok": True, "backend": "mock-milvus"}
+            return {"ok": True, "backend": "mock-milvus", "collections": [settings.milvus_collection, settings.milvus_case_collection]}
         try:
-            self._ensure_collection()
+            self._ensure_collection(settings.milvus_collection)
+            self._ensure_collection(settings.milvus_case_collection)
             self._client().list_collections()
-            return {"ok": True, "backend": settings.milvus_uri, "collection": settings.milvus_collection}
-        except Exception as exc:  # pragma: no cover - exercised in app runtime
-            return {
-                "ok": False,
-                "backend": settings.milvus_uri,
-                "collection": settings.milvus_collection,
-                "error": str(exc),
-            }
+            return {"ok": True, "backend": settings.milvus_uri, "collections": [settings.milvus_collection, settings.milvus_case_collection]}
+        except Exception as exc:
+            return {"ok": False, "backend": settings.milvus_uri, "collections": [settings.milvus_collection, settings.milvus_case_collection], "error": str(exc)}
 
 
 milvus_store = MilvusStore()

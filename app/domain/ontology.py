@@ -1,4 +1,4 @@
-ENTITY_TYPES = {
+﻿ENTITY_TYPES = {
     "issue": "Issue",
     "phenomenon": "Phenomenon",
     "component": "Component",
@@ -25,5 +25,5 @@ RELATION_TYPES = {
 ENTITY_ALIASES = {
     "泄露": "泄漏",
     "液压油泵": "液压泵",
-    "密封圈失效": "密封圈老化",
+    "密封圈失效": "密封失效",
 }
