@@ -6,7 +6,7 @@ from functools import lru_cache
 from typing import Any
 
 from pymilvus import DataType, MilvusClient
-from pymilvus.exceptions import DataNotMatchException
+from pymilvus.exceptions import DataNotMatchException, MilvusException
 
 from app.core.config import Settings, get_settings
 from app.core.db_mysql import cases_table, chunks_table
@@ -167,6 +167,19 @@ class MilvusStore:
             return
         client.create_collection(collection_name=collection_name, schema=self._build_schema(), metric_type="IP")
 
+    def _load_collection(self, collection_name: str) -> None:
+        load = getattr(self._client(), "load_collection", None)
+        if not callable(load):
+            return
+        try:
+            load(collection_name=collection_name)
+        except TypeError:
+            load(collection_name)
+
+    def _ensure_collection_loaded(self, collection_name: str) -> None:
+        self._ensure_collection(collection_name)
+        self._load_collection(collection_name)
+
     def recreate_collection(self, collection_name: str) -> None:
         client = self._client()
         if client.has_collection(collection_name=collection_name):
@@ -284,16 +297,29 @@ class MilvusStore:
         metadata_filter = metadata_filter or {}
         if _is_test_mode(settings):
             return self._mock_search_chunks(query_text, metadata_filter, top_k)
-        self._ensure_collection(settings.milvus_collection)
+        self._ensure_collection_loaded(settings.milvus_collection)
         query_embedding = embed_query(query_text)
         expression = _build_filter_expression(metadata_filter)
-        raw_hits = self._client().search(
-            collection_name=settings.milvus_collection,
-            data=[query_embedding],
-            filter=expression,
-            limit=top_k,
-            output_fields=DEFAULT_SEARCH_FIELDS,
-        )
+        try:
+            raw_hits = self._client().search(
+                collection_name=settings.milvus_collection,
+                data=[query_embedding],
+                filter=expression,
+                limit=top_k,
+                output_fields=DEFAULT_SEARCH_FIELDS,
+            )
+        except MilvusException as exc:
+            if exc.code != 101 and "collection not loaded" not in str(exc).lower():
+                raise
+            logger.warning("Milvus collection '%s' was not loaded at search time; loading and retrying once.", settings.milvus_collection)
+            self._load_collection(settings.milvus_collection)
+            raw_hits = self._client().search(
+                collection_name=settings.milvus_collection,
+                data=[query_embedding],
+                filter=expression,
+                limit=top_k,
+                output_fields=DEFAULT_SEARCH_FIELDS,
+            )
         hits: list[Evidence] = []
         for group in raw_hits:
             for item in group:
@@ -309,14 +335,29 @@ class MilvusStore:
         settings = self._settings()
         if _is_test_mode(settings):
             return self._mock_search_cases(query_text, top_k)
-        self._ensure_collection(settings.milvus_case_collection)
+        self._ensure_collection_loaded(settings.milvus_case_collection)
         query_embedding = embed_query(query_text)
-        raw_hits = self._client().search(
-            collection_name=settings.milvus_case_collection,
-            data=[query_embedding],
-            limit=top_k,
-            output_fields=DEFAULT_SEARCH_FIELDS,
-        )
+        try:
+            raw_hits = self._client().search(
+                collection_name=settings.milvus_case_collection,
+                data=[query_embedding],
+                limit=top_k,
+                output_fields=DEFAULT_SEARCH_FIELDS,
+            )
+        except MilvusException as exc:
+            if exc.code != 101 and "collection not loaded" not in str(exc).lower():
+                raise
+            logger.warning(
+                "Milvus collection '%s' was not loaded at case search time; loading and retrying once.",
+                settings.milvus_case_collection,
+            )
+            self._load_collection(settings.milvus_case_collection)
+            raw_hits = self._client().search(
+                collection_name=settings.milvus_case_collection,
+                data=[query_embedding],
+                limit=top_k,
+                output_fields=DEFAULT_SEARCH_FIELDS,
+            )
         hits: list[Evidence] = []
         for group in raw_hits:
             for item in group:
@@ -333,8 +374,8 @@ class MilvusStore:
         if _is_test_mode(settings):
             return {"ok": True, "backend": "mock-milvus", "collections": [settings.milvus_collection, settings.milvus_case_collection]}
         try:
-            self._ensure_collection(settings.milvus_collection)
-            self._ensure_collection(settings.milvus_case_collection)
+            self._ensure_collection_loaded(settings.milvus_collection)
+            self._ensure_collection_loaded(settings.milvus_case_collection)
             self._client().list_collections()
             return {"ok": True, "backend": settings.milvus_uri, "collections": [settings.milvus_collection, settings.milvus_case_collection]}
         except Exception as exc:

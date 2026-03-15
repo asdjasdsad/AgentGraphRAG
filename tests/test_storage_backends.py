@@ -92,6 +92,50 @@ def test_milvus_store_calls_real_client(monkeypatch) -> None:
     assert upsert_request["kwargs"]["data"][0]["id"] == "chunk_001"
 
 
+def test_milvus_store_loads_collection_before_search(monkeypatch) -> None:
+    requests: list[dict] = []
+
+    class FakeMilvusClient:
+        def __init__(self, **kwargs) -> None:
+            requests.append({"kind": "init", "kwargs": kwargs})
+
+        def has_collection(self, collection_name: str) -> bool:
+            requests.append({"kind": "has_collection", "collection_name": collection_name})
+            return True
+
+        def load_collection(self, collection_name: str) -> None:
+            requests.append({"kind": "load_collection", "collection_name": collection_name})
+
+        def search(self, **kwargs):
+            requests.append({"kind": "search", "kwargs": kwargs})
+            return [[{"id": "chunk_001", "distance": 0.9, "entity": {"id": "chunk_001", "content": "match"}}]]
+
+    settings = SimpleNamespace(
+        app_env="dev",
+        milvus_uri="http://127.0.0.1:19530",
+        milvus_token="",
+        milvus_database="default",
+        milvus_collection="chunks",
+        milvus_case_collection="cases",
+        embedding_dimensions=256,
+    )
+    monkeypatch.setattr("app.core.db_milvus.get_settings", lambda: settings)
+    monkeypatch.setattr("app.core.db_milvus.MilvusClient", FakeMilvusClient)
+    monkeypatch.setattr("app.core.db_milvus.embed_query", lambda text: [1.0, 0.0, 0.0])
+    monkeypatch.setattr("app.core.db_milvus.chunks_table.get", lambda **kwargs: {"chunk_id": kwargs.get("chunk_id"), "content": "match"})
+    reset_milvus_clients()
+
+    store = MilvusStore()
+    hits = store.search("demo question", {"document_id": "doc_001"}, 3)
+
+    load_request = next(item for item in requests if item["kind"] == "load_collection")
+    search_request = next(item for item in requests if item["kind"] == "search")
+    assert load_request["collection_name"] == "chunks"
+    assert search_request["kwargs"]["collection_name"] == "chunks"
+    assert search_request["kwargs"]["filter"] == 'document_id == "doc_001"'
+    assert hits[0].evidence_id == "chunk_001"
+
+
 def test_graph_store_calls_neo4j_driver(monkeypatch, tmp_path) -> None:
     run_calls: list[dict] = []
 
