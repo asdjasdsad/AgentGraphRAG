@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from collections.abc import Iterable
 from functools import lru_cache
@@ -29,6 +29,18 @@ DEFAULT_SEARCH_FIELDS = [
     "summary",
     "issue_type",
 ]
+
+
+def _normalize_datatype_name(value: Any) -> str:
+    if value is None:
+        return "UNKNOWN"
+    name = getattr(value, "name", None)
+    if name:
+        return str(name).upper()
+    text = str(value).upper()
+    if "." in text:
+        text = text.rsplit(".", 1)[-1]
+    return text
 
 
 def reset_milvus_clients() -> None:
@@ -79,15 +91,61 @@ class MilvusStore:
         settings = self._settings()
         return get_milvus_client(settings.milvus_uri, settings.milvus_token, settings.milvus_database)
 
-    def _ensure_collection(self, collection_name: str) -> None:
+    def _build_schema(self) -> Any:
         settings = self._settings()
         client = self._client()
-        if client.has_collection(collection_name=collection_name):
-            return
         schema = client.create_schema(auto_id=False, enable_dynamic_field=True)
         schema.add_field(DEFAULT_ID_FIELD, DataType.VARCHAR, is_primary=True, max_length=DEFAULT_ID_MAX_LENGTH)
         schema.add_field(DEFAULT_VECTOR_FIELD, DataType.FLOAT_VECTOR, dim=settings.embedding_dimensions)
-        client.create_collection(collection_name=collection_name, schema=schema, metric_type="IP")
+        return schema
+
+    def _describe_collection(self, collection_name: str) -> dict[str, Any] | None:
+        describe = getattr(self._client(), "describe_collection", None)
+        if not callable(describe):
+            return None
+        try:
+            data = describe(collection_name=collection_name)
+        except TypeError:
+            data = describe(collection_name)
+        return data if isinstance(data, dict) else None
+
+    def _extract_primary_field(self, collection_name: str) -> dict[str, Any] | None:
+        description = self._describe_collection(collection_name)
+        if not description:
+            return None
+        fields = description.get("fields")
+        if not isinstance(fields, list):
+            return None
+        for field in fields:
+            if isinstance(field, dict) and field.get("is_primary"):
+                return field
+        return None
+
+    def _validate_collection_schema(self, collection_name: str) -> None:
+        primary_field = self._extract_primary_field(collection_name)
+        if not primary_field:
+            return
+        field_name = str(primary_field.get("name") or primary_field.get("field_name") or "UNKNOWN")
+        data_type = _normalize_datatype_name(primary_field.get("type") or primary_field.get("data_type"))
+        if field_name != DEFAULT_ID_FIELD or data_type != "VARCHAR":
+            raise RuntimeError(
+                f"Milvus collection '{collection_name}' schema is incompatible: "
+                f"primary field is '{field_name}' ({data_type}), expected '{DEFAULT_ID_FIELD}' (VARCHAR). "
+                "Recreate the collection before ingestion."
+            )
+
+    def _ensure_collection(self, collection_name: str) -> None:
+        client = self._client()
+        if client.has_collection(collection_name=collection_name):
+            self._validate_collection_schema(collection_name)
+            return
+        client.create_collection(collection_name=collection_name, schema=self._build_schema(), metric_type="IP")
+
+    def recreate_collection(self, collection_name: str) -> None:
+        client = self._client()
+        if client.has_collection(collection_name=collection_name):
+            client.drop_collection(collection_name=collection_name)
+        client.create_collection(collection_name=collection_name, schema=self._build_schema(), metric_type="IP")
 
     def _mock_insert_chunks(self, chunks: list[Chunk]) -> None:
         embeddings = embed_documents([chunk.content for chunk in chunks]) if chunks else []
@@ -150,6 +208,7 @@ class MilvusStore:
             try:
                 self._client().upsert(collection_name=settings.milvus_collection, data=rows)
             except DataNotMatchException as exc:
+                self._validate_collection_schema(settings.milvus_collection)
                 raise RuntimeError(
                     f"Milvus collection '{settings.milvus_collection}' schema is incompatible with string IDs. "
                     f"Recreate the collection with VARCHAR primary key '{DEFAULT_ID_FIELD}'."
@@ -180,6 +239,7 @@ class MilvusStore:
             try:
                 self._client().upsert(collection_name=settings.milvus_case_collection, data=rows)
             except DataNotMatchException as exc:
+                self._validate_collection_schema(settings.milvus_case_collection)
                 raise RuntimeError(
                     f"Milvus collection '{settings.milvus_case_collection}' schema is incompatible with string IDs. "
                     f"Recreate the collection with VARCHAR primary key '{DEFAULT_ID_FIELD}'."
