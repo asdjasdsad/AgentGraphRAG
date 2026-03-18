@@ -177,5 +177,53 @@ class GraphStore:
         except Exception as exc:
             return {"ok": False, "backend": settings.neo4j_uri, "database": settings.neo4j_database, "error": str(exc)}
 
+    def storage_status(self) -> dict[str, Any]:
+        settings = self._settings()
+        if _is_test_mode(settings):
+            snapshot = self.snapshot(limit=20)
+            entity_types = sorted({item.get("type", "Entity") for item in snapshot.get("entities", [])})
+            relation_types = sorted({item.get("type", "") for item in snapshot.get("relations", []) if item.get("type")})
+            return {
+                "ok": True,
+                "backend": "mock-neo4j",
+                "database": "mock",
+                "counts": snapshot.get("counts", {"entities": 0, "relations": 0}),
+                "entity_types": entity_types,
+                "relation_types": relation_types,
+            }
+        try:
+            counts = {"entities": 0, "relations": 0}
+            entity_types: list[str] = []
+            relation_types: list[str] = []
+            with self._driver().session(database=settings.neo4j_database) as session:
+                counts["entities"] = session.run("MATCH (n) RETURN count(n) AS count").single()["count"]
+                counts["relations"] = session.run("MATCH ()-[r]->() RETURN count(r) AS count").single()["count"]
+                entity_types = [
+                    row["label"]
+                    for row in session.run("MATCH (n) UNWIND labels(n) AS label RETURN DISTINCT label ORDER BY label LIMIT 50")
+                ]
+                relation_types = [
+                    row["type"]
+                    for row in session.run("MATCH ()-[r]->() RETURN DISTINCT type(r) AS type ORDER BY type LIMIT 50")
+                ]
+            return {
+                "ok": True,
+                "backend": settings.neo4j_uri,
+                "database": settings.neo4j_database,
+                "counts": counts,
+                "entity_types": entity_types,
+                "relation_types": relation_types,
+            }
+        except Exception as exc:
+            return {
+                "ok": False,
+                "backend": settings.neo4j_uri,
+                "database": settings.neo4j_database,
+                "counts": {"entities": 0, "relations": 0},
+                "entity_types": [],
+                "relation_types": [],
+                "error": str(exc),
+            }
+
 
 graph_store = GraphStore()

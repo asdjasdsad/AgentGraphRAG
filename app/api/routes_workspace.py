@@ -90,6 +90,8 @@ WORKSPACE_HTML = """<!DOCTYPE html>
           </div>
           <div class=\"nav\">
             <a href=\"/workspace\">工作台</a>
+            <a class=\"alt\" href=\"/workspace/milvus\">Milvus</a>
+            <a class=\"alt\" href=\"/workspace/neo4j\">Neo4j</a>
             <a class=\"alt\" href=\"/settings\">配置中心</a>
             <a class=\"alt\" href=\"/api/v1/prompts\" target=\"_blank\" rel=\"noreferrer\">Prompt Registry</a>
             <a class=\"alt\" href=\"/health\" target=\"_blank\" rel=\"noreferrer\">健康检查</a>
@@ -145,9 +147,36 @@ WORKSPACE_HTML = """<!DOCTYPE html>
             <h2>3. 问答结果与 Trace</h2>
             <div id=\"qaResult\" class=\"list\"></div>
           </section>
+
+          <section class=\"panel\">
+            <h2>4. 结构化数据接入</h2>
+            <p class=\"panel__intro\">供其他部门直接调用 `/api/v1/ingestion/structured-records`。这里也可直接粘贴 JSON 进行联调。</p>
+            <label>
+              结构化记录 JSON
+              <textarea id=\"structuredInput\">[
+  {
+    "issue_id": "Q2026-001",
+    "phenomenon": "喷洒作业过程中直升机挂碰高压线",
+    "component": ["主旋翼"],
+    "cause": ["作业前勘察不充分", "逆光影响目视观察"],
+    "action": ["加强作业前勘察", "完善高风险作业风险评估"],
+    "source_system": "external_dept_a"
+  }
+]</textarea>
+            </label>
+            <div class=\"actions\">
+              <button onclick=\"submitStructuredRecords()\">提交结构化数据</button>
+            </div>
+            <div id=\"structuredStatus\" class=\"status\">等待提交。</div>
+          </section>
         </section>
 
         <section class=\"stack\">
+          <section class=\"panel\">
+            <h2>存储状态</h2>
+            <div id=\"storageStatus\" class=\"list\"></div>
+          </section>
+
           <section class=\"panel\">
             <h2>最近文档</h2>
             <div id=\"documentsList\" class=\"list\"></div>
@@ -209,11 +238,12 @@ WORKSPACE_HTML = """<!DOCTYPE html>
       }
 
       async function refreshWorkspace() {
-        const [documents, jobs, logs, graph] = await Promise.all([
+        const [documents, jobs, logs, graph, storage] = await Promise.all([
           fetchJson(`${apiPrefix}/documents`),
           fetchJson(`${apiPrefix}/ingestion`),
           fetchJson(`${apiPrefix}/audit/logs`),
           fetchJson(`${apiPrefix}/knowledge/graph?limit=20`),
+          fetchJson(`${apiPrefix}/knowledge/storage/status`),
         ]);
 
         renderCards('documentsList', documents.slice(0, 8), (item) => `
@@ -258,6 +288,46 @@ WORKSPACE_HTML = """<!DOCTYPE html>
         `);
 
         renderGraph(graph);
+        renderStorageStatus(storage);
+      }
+
+      function renderStorageStatus(storage) {
+        const milvusCollections = (storage.milvus?.collections || []).map((item) => `
+          <div class="subpanel">
+            <strong>${escapeHtml(item.name)}</strong>
+            <div class="meta">
+              <span>exists=${escapeHtml(item.exists)}</span>
+              <span>rows=${escapeHtml(item.row_count ?? '-')}</span>
+              <span>has_index=${escapeHtml(item.has_index)}</span>
+            </div>
+            <div class="tiny">indexes=${escapeHtml((item.indexes || []).join(', ') || 'none')}</div>
+          </div>
+        `).join('');
+        const neo4j = storage.neo4j || {};
+        document.getElementById('storageStatus').innerHTML = `
+          <div class="card">
+            <strong>Milvus</strong>
+            <div class="meta">
+              <span>ok=${escapeHtml(storage.milvus?.ok)}</span>
+              <span>documents=${escapeHtml(storage.documents?.count ?? 0)}</span>
+              <span>chunks=${escapeHtml(storage.chunks?.count ?? 0)}</span>
+              <span>cases=${escapeHtml(storage.cases?.count ?? 0)}</span>
+            </div>
+            <div class="tiny">${escapeHtml(storage.milvus?.backend || '')}</div>
+            <div class="list">${milvusCollections || '<div class="card">暂无 collection 信息</div>'}</div>
+          </div>
+          <div class="card">
+            <strong>Neo4j</strong>
+            <div class="meta">
+              <span>ok=${escapeHtml(neo4j.ok)}</span>
+              <span>nodes=${escapeHtml(neo4j.counts?.entities ?? 0)}</span>
+              <span>relations=${escapeHtml(neo4j.counts?.relations ?? 0)}</span>
+            </div>
+            <div class="tiny">${escapeHtml(neo4j.backend || '')} | db=${escapeHtml(neo4j.database || '')}</div>
+            <div class="tiny">labels=${escapeHtml((neo4j.entity_types || []).join(', ') || 'none')}</div>
+            <div class="tiny">relation_types=${escapeHtml((neo4j.relation_types || []).join(', ') || 'none')}</div>
+          </div>
+        `;
       }
 
       async function loadDocumentPreview(documentId) {
@@ -400,6 +470,23 @@ WORKSPACE_HTML = """<!DOCTYPE html>
         }
       }
 
+      async function submitStructuredRecords() {
+        try {
+          const raw = document.getElementById('structuredInput').value.trim();
+          const records = JSON.parse(raw);
+          setStatus('structuredStatus', '正在提交结构化数据...');
+          const result = await fetchJson(`${apiPrefix}/ingestion/structured-records`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ records }),
+          });
+          setStatus('structuredStatus', `提交成功\\njob=${result.job?.job_id || ''}\\naccepted_records=${result.accepted_records}\\nchunks=${result.result?.chunks ?? '-'}\\nentities=${result.result?.entities ?? '-'}`);
+          await refreshWorkspace();
+        } catch (error) {
+          setStatus('structuredStatus', `提交失败：${error.message}`, true);
+        }
+      }
+
       function renderQA(payload) {
         const target = document.getElementById('qaResult');
         const evidenceHtml = (payload.evidence || []).map((item) => `
@@ -451,3 +538,311 @@ WORKSPACE_HTML = """<!DOCTYPE html>
 @router.get("/workspace", response_class=HTMLResponse, include_in_schema=False)
 def workspace_page() -> HTMLResponse:
     return HTMLResponse(WORKSPACE_HTML)
+
+
+MILVUS_HTML = """<!DOCTYPE html>
+<html lang=\"zh-CN\">
+  <head>
+    <meta charset=\"utf-8\" />
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+    <title>Milvus Storage View</title>
+    <style>
+      :root {
+        --bg: #f3efe7;
+        --panel: rgba(255,255,255,.86);
+        --line: rgba(37, 46, 40, .12);
+        --text: #1d2722;
+        --muted: #5d6c65;
+        --accent: #135f57;
+        --accent-2: #bb5a2c;
+        --shadow: 0 24px 64px rgba(18, 28, 24, .12);
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; color: var(--text); font-family: "IBM Plex Sans", "Noto Sans SC", sans-serif; background: radial-gradient(circle at top left, rgba(19,95,87,.18), transparent 24%), linear-gradient(135deg, #f8f4ec, var(--bg)); }
+      .page { max-width: 1460px; margin: 0 auto; padding: 24px 18px 48px; }
+      .hero, .panel { border: 1px solid var(--line); border-radius: 28px; background: var(--panel); box-shadow: var(--shadow); }
+      .hero { padding: 28px; display: grid; gap: 16px; }
+      .hero__top { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+      .eyebrow { display: inline-flex; padding: 6px 10px; border-radius: 999px; background: rgba(19,95,87,.12); color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+      h1 { margin: 12px 0 6px; font-size: clamp(30px, 4vw, 52px); line-height: 1.02; }
+      p { margin: 0; line-height: 1.6; color: var(--muted); }
+      .nav { display:flex; gap:10px; flex-wrap:wrap; }
+      .nav a, button { border:0; cursor:pointer; border-radius:999px; padding:12px 16px; text-decoration:none; font:inherit; font-weight:700; color:white; background: linear-gradient(135deg, #1f7a71, #0f534d); }
+      .nav a.alt, button.alt { background: rgba(31,37,34,.08); color: var(--text); }
+      .grid { display:grid; grid-template-columns: 1.05fr .95fr; gap:18px; margin-top:18px; }
+      .stack { display:grid; gap:18px; }
+      .panel { padding:20px; }
+      .panel h2 { margin:0 0 10px; font-size:22px; }
+      .actions { display:flex; gap:12px; flex-wrap:wrap; margin-top:16px; }
+      .status { margin-top:14px; padding:12px 14px; border-radius:16px; background: rgba(19,95,87,.09); color: var(--accent); font-weight:600; white-space:pre-wrap; }
+      .list { display:grid; gap:12px; margin-top:14px; }
+      .card, .subpanel { border:1px solid var(--line); border-radius:18px; padding:14px; background: rgba(255,255,255,.68); }
+      .meta { font-size:13px; color: var(--muted); display:flex; gap:10px; flex-wrap:wrap; }
+      .mono { font-family: "IBM Plex Mono", Consolas, monospace; }
+      .tiny { font-size: 12px; color: var(--muted); }
+      @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main class=\"page\">
+      <section class=\"hero\">
+        <div class=\"hero__top\">
+          <div>
+            <span class=\"eyebrow\">Subpage</span>
+            <h1>Milvus 存储视图</h1>
+            <p>查看 collection 当前状态、索引、schema，并抽样查看已写入的 chunk 与 case memory 内容。</p>
+          </div>
+          <div class=\"nav\">
+            <a href=\"/workspace\">工作台</a>
+            <a href=\"/workspace/neo4j\">Neo4j</a>
+            <a class=\"alt\" href=\"/settings\">配置中心</a>
+          </div>
+        </div>
+      </section>
+      <div class=\"grid\">
+        <section class=\"stack\">
+          <section class=\"panel\">
+            <h2>Collection 状态</h2>
+            <div class=\"actions\"><button onclick=\"refreshMilvus()\">刷新状态</button></div>
+            <div id=\"milvusStatus\" class=\"status\">等待加载。</div>
+            <div id=\"collectionCards\" class=\"list\"></div>
+          </section>
+        </section>
+        <section class=\"stack\">
+          <section class=\"panel\">
+            <h2>Chunk 样本</h2>
+            <div id=\"chunkSamples\" class=\"list\"></div>
+          </section>
+          <section class=\"panel\">
+            <h2>Case Memory 样本</h2>
+            <div id=\"caseSamples\" class=\"list\"></div>
+          </section>
+        </section>
+      </div>
+    </main>
+    <script>
+      const apiPrefix = '/api/v1';
+      function escapeHtml(text) { return String(text || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;'); }
+      async function fetchJson(url, options = {}) {
+        const response = await fetch(url, options);
+        if (!response.ok) throw new Error(await response.text() || `HTTP ${response.status}`);
+        return response.json();
+      }
+      function renderList(targetId, items, mapper, empty = '暂无数据') {
+        const target = document.getElementById(targetId);
+        target.innerHTML = items.length ? items.map(mapper).join('') : `<div class="card">${empty}</div>`;
+      }
+      async function refreshMilvus() {
+        const [status, chunks, cases] = await Promise.all([
+          fetchJson(`${apiPrefix}/knowledge/storage/status`),
+          fetchJson(`${apiPrefix}/knowledge/chunks?limit=12`),
+          fetchJson(`${apiPrefix}/knowledge/cases?limit=12`),
+        ]);
+        document.getElementById('milvusStatus').textContent = `ok=${status.milvus?.ok} | backend=${status.milvus?.backend || ''} | chunks=${status.chunks?.count ?? 0} | cases=${status.cases?.count ?? 0}`;
+        renderList('collectionCards', status.milvus?.collections || [], (item) => `
+          <div class="card">
+            <strong>${escapeHtml(item.name)}</strong>
+            <div class="meta">
+              <span>exists=${escapeHtml(item.exists)}</span>
+              <span>loaded=${escapeHtml(item.loaded)}</span>
+              <span>has_index=${escapeHtml(item.has_index)}</span>
+              <span>rows=${escapeHtml(item.row_count ?? '-')}</span>
+            </div>
+            <div class="tiny mono">indexes=${escapeHtml((item.indexes || []).join(', ') || 'none')}</div>
+            <div class="list">
+              ${((item.schema?.fields || []).map((field) => `<div class="subpanel"><strong>${escapeHtml(field.name)}</strong><div class="meta"><span>${escapeHtml(field.type)}</span><span>primary=${escapeHtml(field.primary)}</span></div></div>`).join('')) || '<div class="subpanel">暂无 schema 字段</div>'}
+            </div>
+          </div>
+        `);
+        renderList('chunkSamples', chunks, (item) => `
+          <div class="card">
+            <strong>${escapeHtml(item.chunk_id)}</strong>
+            <div class="meta">
+              <span>${escapeHtml(item.document_id)}</span>
+              <span>${escapeHtml(item.chunk_type)}</span>
+              <span>page=${escapeHtml(item.page_no ?? '-')}</span>
+            </div>
+            <div>${escapeHtml(item.content).slice(0, 260)}</div>
+          </div>
+        `, '暂无 chunk 样本');
+        renderList('caseSamples', cases, (item) => `
+          <div class="card">
+            <strong>${escapeHtml(item.case_id)}</strong>
+            <div class="meta">
+              <span>${escapeHtml(item.issue_type)}</span>
+              <span>sources=${escapeHtml((item.source_docs_json || []).length)}</span>
+            </div>
+            <div>${escapeHtml(item.summary).slice(0, 260)}</div>
+          </div>
+        `, '暂无 case memory 样本');
+      }
+      refreshMilvus().catch((error) => { document.getElementById('milvusStatus').textContent = `加载失败：${error.message}`; });
+    </script>
+  </body>
+</html>
+"""
+
+
+NEO4J_HTML = """<!DOCTYPE html>
+<html lang=\"zh-CN\">
+  <head>
+    <meta charset=\"utf-8\" />
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+    <title>Neo4j Graph View</title>
+    <style>
+      :root {
+        --bg: #f4efe7;
+        --panel: rgba(255,255,255,.86);
+        --line: rgba(33, 40, 53, .12);
+        --text: #1e2530;
+        --muted: #68727c;
+        --accent: #bb5a2c;
+        --accent-2: #135f57;
+        --shadow: 0 24px 64px rgba(18, 24, 34, .12);
+      }
+      * { box-sizing: border-box; }
+      body { margin:0; color:var(--text); font-family: "IBM Plex Sans", "Noto Sans SC", sans-serif; background: radial-gradient(circle at top right, rgba(187,90,44,.18), transparent 24%), linear-gradient(135deg, #faf6ef, var(--bg)); }
+      .page { max-width: 1460px; margin:0 auto; padding:24px 18px 48px; }
+      .hero, .panel { border:1px solid var(--line); border-radius:28px; background:var(--panel); box-shadow:var(--shadow); }
+      .hero { padding:28px; display:grid; gap:16px; }
+      .hero__top { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; flex-wrap:wrap; }
+      .eyebrow { display:inline-flex; padding:6px 10px; border-radius:999px; background: rgba(187,90,44,.12); color: var(--accent); font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+      h1 { margin:12px 0 6px; font-size: clamp(30px, 4vw, 52px); line-height:1.02; }
+      p { margin:0; line-height:1.6; color:var(--muted); }
+      .nav { display:flex; gap:10px; flex-wrap:wrap; }
+      .nav a, button { border:0; cursor:pointer; border-radius:999px; padding:12px 16px; text-decoration:none; font:inherit; font-weight:700; color:white; background: linear-gradient(135deg, #cc7240, #95431f); }
+      .nav a.alt, button.alt { background: rgba(31,37,34,.08); color: var(--text); }
+      .grid { display:grid; grid-template-columns: 1.15fr .85fr; gap:18px; margin-top:18px; }
+      .stack { display:grid; gap:18px; }
+      .panel { padding:20px; }
+      .panel h2 { margin:0 0 10px; font-size:22px; }
+      .actions { display:flex; gap:12px; flex-wrap:wrap; margin-top:16px; }
+      .status { margin-top:14px; padding:12px 14px; border-radius:16px; background: rgba(19,95,87,.09); color: var(--accent-2); font-weight:600; white-space:pre-wrap; }
+      .list { display:grid; gap:12px; margin-top:14px; }
+      .card, .subpanel { border:1px solid var(--line); border-radius:18px; padding:14px; background: rgba(255,255,255,.68); }
+      .meta { font-size:13px; color: var(--muted); display:flex; gap:10px; flex-wrap:wrap; }
+      .tiny { font-size:12px; color:var(--muted); }
+      svg { width:100%; height:620px; border-radius:22px; background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(245,240,231,.9)); border:1px solid var(--line); }
+      @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } svg { height: 480px; } }
+    </style>
+  </head>
+  <body>
+    <main class=\"page\">
+      <section class=\"hero\">
+        <div class=\"hero__top\">
+          <div>
+            <span class=\"eyebrow\">Subpage</span>
+            <h1>Neo4j 图谱视图</h1>
+            <p>查看图谱当前节点和关系统计，并用简化画布展示关系网络。</p>
+          </div>
+          <div class=\"nav\">
+            <a href=\"/workspace\">工作台</a>
+            <a href=\"/workspace/milvus\">Milvus</a>
+            <a class=\"alt\" href=\"/settings\">配置中心</a>
+          </div>
+        </div>
+      </section>
+      <div class=\"grid\">
+        <section class=\"stack\">
+          <section class=\"panel\">
+            <h2>图谱画布</h2>
+            <div class=\"actions\"><button onclick=\"refreshGraph()\">刷新图谱</button></div>
+            <div id=\"neo4jStatus\" class=\"status\">等待加载。</div>
+            <svg id=\"graphCanvas\" viewBox=\"0 0 900 620\"></svg>
+          </section>
+        </section>
+        <section class=\"stack\">
+          <section class=\"panel\">
+            <h2>节点类型</h2>
+            <div id=\"labelList\" class=\"list\"></div>
+          </section>
+          <section class=\"panel\">
+            <h2>关系样本</h2>
+            <div id=\"relationList\" class=\"list\"></div>
+          </section>
+        </section>
+      </div>
+    </main>
+    <script>
+      const apiPrefix = '/api/v1';
+      const palette = ['#135f57', '#bb5a2c', '#5c7c4a', '#7c5d3f', '#406da1', '#7d4aa5'];
+      function escapeHtml(text) { return String(text || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;'); }
+      async function fetchJson(url, options = {}) {
+        const response = await fetch(url, options);
+        if (!response.ok) throw new Error(await response.text() || `HTTP ${response.status}`);
+        return response.json();
+      }
+      function renderList(targetId, items, mapper, empty = '暂无数据') {
+        const target = document.getElementById(targetId);
+        target.innerHTML = items.length ? items.map(mapper).join('') : `<div class="card">${empty}</div>`;
+      }
+      function drawGraph(snapshot) {
+        const svg = document.getElementById('graphCanvas');
+        const entities = (snapshot.entities || []).slice(0, 18);
+        const relations = (snapshot.relations || []).slice(0, 24);
+        const centerX = 450;
+        const centerY = 310;
+        const radius = 220;
+        const indexByName = new Map();
+        const positioned = entities.map((item, index) => {
+          const angle = (Math.PI * 2 * index) / Math.max(entities.length, 1);
+          const node = {
+            ...item,
+            x: centerX + Math.cos(angle) * radius,
+            y: centerY + Math.sin(angle) * radius,
+            color: palette[index % palette.length],
+          };
+          indexByName.set(item.name, node);
+          return node;
+        });
+        const lines = relations.map((rel) => {
+          const source = indexByName.get(rel.source);
+          const target = indexByName.get(rel.target);
+          if (!source || !target) return '';
+          const midX = (source.x + target.x) / 2;
+          const midY = (source.y + target.y) / 2;
+          return `
+            <line x1="${source.x}" y1="${source.y}" x2="${target.x}" y2="${target.y}" stroke="rgba(70,80,90,.35)" stroke-width="2" />
+            <text x="${midX}" y="${midY}" fill="#6a5443" font-size="12" text-anchor="middle">${escapeHtml(rel.type || '')}</text>
+          `;
+        }).join('');
+        const nodes = positioned.map((node) => `
+          <g>
+            <circle cx="${node.x}" cy="${node.y}" r="28" fill="${node.color}" opacity="0.92"></circle>
+            <text x="${node.x}" y="${node.y - 38}" fill="#1e2530" font-size="12" text-anchor="middle">${escapeHtml(node.name || '')}</text>
+            <text x="${node.x}" y="${node.y + 5}" fill="white" font-size="11" text-anchor="middle">${escapeHtml(node.type || '')}</text>
+          </g>
+        `).join('');
+        svg.innerHTML = `<rect x="0" y="0" width="900" height="620" fill="transparent"></rect>${lines}${nodes}`;
+      }
+      async function refreshGraph() {
+        const [status, graph] = await Promise.all([
+          fetchJson(`${apiPrefix}/knowledge/storage/status`),
+          fetchJson(`${apiPrefix}/knowledge/graph?limit=80`),
+        ]);
+        const neo4j = status.neo4j || {};
+        document.getElementById('neo4jStatus').textContent = `ok=${neo4j.ok} | db=${neo4j.database || ''} | nodes=${neo4j.counts?.entities ?? 0} | relations=${neo4j.counts?.relations ?? 0}`;
+        drawGraph(graph);
+        renderList('labelList', neo4j.entity_types || [], (item) => `<div class="card"><strong>${escapeHtml(item)}</strong></div>`, '暂无标签');
+        renderList('relationList', (graph.relations || []).slice(0, 20), (item) => `
+          <div class="card">
+            <strong>${escapeHtml(item.source || '')}</strong>
+            <div class="meta"><span>${escapeHtml(item.type || '')}</span><span>${escapeHtml(item.target || '')}</span></div>
+          </div>
+        `, '暂无关系');
+      }
+      refreshGraph().catch((error) => { document.getElementById('neo4jStatus').textContent = `加载失败：${error.message}`; });
+    </script>
+  </body>
+</html>
+"""
+
+
+@router.get("/workspace/milvus", response_class=HTMLResponse, include_in_schema=False)
+def workspace_milvus_page() -> HTMLResponse:
+    return HTMLResponse(MILVUS_HTML)
+
+
+@router.get("/workspace/neo4j", response_class=HTMLResponse, include_in_schema=False)
+def workspace_neo4j_page() -> HTMLResponse:
+    return HTMLResponse(NEO4J_HTML)

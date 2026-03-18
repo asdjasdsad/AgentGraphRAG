@@ -114,6 +114,17 @@ class MilvusStore:
         schema.add_field(DEFAULT_VECTOR_FIELD, DataType.FLOAT_VECTOR, dim=settings.embedding_dimensions)
         return schema
 
+    def _build_index_params(self) -> Any:
+        client = self._client()
+        index_params = client.prepare_index_params()
+        index_params.add_index(
+            field_name=DEFAULT_VECTOR_FIELD,
+            index_name=f"{DEFAULT_VECTOR_FIELD}_idx",
+            index_type="AUTOINDEX",
+            metric_type="IP",
+        )
+        return index_params
+
     def _describe_collection(self, collection_name: str) -> dict[str, Any] | None:
         describe = getattr(self._client(), "describe_collection", None)
         if not callable(describe):
@@ -145,6 +156,32 @@ class MilvusStore:
         if field_name != DEFAULT_ID_FIELD or data_type != "VARCHAR":
             raise MilvusSchemaMismatchError(collection_name, field_name, data_type)
 
+    def _list_indexes(self, collection_name: str) -> list[str]:
+        list_indexes = getattr(self._client(), "list_indexes", None)
+        if not callable(list_indexes):
+            return []
+        indexes = list_indexes(collection_name=collection_name)
+        if not indexes:
+            return []
+        normalized: list[str] = []
+        for item in indexes:
+            if isinstance(item, str):
+                normalized.append(item)
+            elif isinstance(item, dict):
+                name = item.get("index_name") or item.get("name")
+                if name:
+                    normalized.append(str(name))
+        return normalized
+
+    def _has_vector_index(self, collection_name: str) -> bool:
+        return bool(self._list_indexes(collection_name))
+
+    def _ensure_vector_index(self, collection_name: str) -> None:
+        if self._has_vector_index(collection_name):
+            return
+        logger.warning("Milvus collection '%s' has no vector index; creating one now.", collection_name)
+        self._client().create_index(collection_name=collection_name, index_params=self._build_index_params())
+
     def _handle_schema_mismatch(self, collection_name: str, exc: MilvusSchemaMismatchError) -> None:
         settings = self._settings()
         if not settings.milvus_auto_recreate_on_schema_mismatch:
@@ -164,8 +201,14 @@ class MilvusStore:
                 self._validate_collection_schema(collection_name)
             except MilvusSchemaMismatchError as exc:
                 self._handle_schema_mismatch(collection_name, exc)
+            self._ensure_vector_index(collection_name)
             return
-        client.create_collection(collection_name=collection_name, schema=self._build_schema(), metric_type="IP")
+        client.create_collection(
+            collection_name=collection_name,
+            schema=self._build_schema(),
+            metric_type="IP",
+            index_params=self._build_index_params(),
+        )
 
     def _load_collection(self, collection_name: str) -> None:
         load = getattr(self._client(), "load_collection", None)
@@ -184,7 +227,12 @@ class MilvusStore:
         client = self._client()
         if client.has_collection(collection_name=collection_name):
             client.drop_collection(collection_name=collection_name)
-        client.create_collection(collection_name=collection_name, schema=self._build_schema(), metric_type="IP")
+        client.create_collection(
+            collection_name=collection_name,
+            schema=self._build_schema(),
+            metric_type="IP",
+            index_params=self._build_index_params(),
+        )
 
     def _mock_insert_chunks(self, chunks: list[Chunk]) -> None:
         embeddings = embed_documents([chunk.content for chunk in chunks]) if chunks else []
@@ -309,17 +357,33 @@ class MilvusStore:
                 output_fields=DEFAULT_SEARCH_FIELDS,
             )
         except MilvusException as exc:
-            if exc.code != 101 and "collection not loaded" not in str(exc).lower():
+            error_text = str(exc).lower()
+            if exc.code == 700 and "index not found" in error_text:
+                logger.warning(
+                    "Milvus collection '%s' search failed because index is missing; creating index and retrying once.",
+                    settings.milvus_collection,
+                )
+                self._ensure_vector_index(settings.milvus_collection)
+                self._load_collection(settings.milvus_collection)
+                raw_hits = self._client().search(
+                    collection_name=settings.milvus_collection,
+                    data=[query_embedding],
+                    filter=expression,
+                    limit=top_k,
+                    output_fields=DEFAULT_SEARCH_FIELDS,
+                )
+            elif exc.code != 101 and "collection not loaded" not in error_text:
                 raise
-            logger.warning("Milvus collection '%s' was not loaded at search time; loading and retrying once.", settings.milvus_collection)
-            self._load_collection(settings.milvus_collection)
-            raw_hits = self._client().search(
-                collection_name=settings.milvus_collection,
-                data=[query_embedding],
-                filter=expression,
-                limit=top_k,
-                output_fields=DEFAULT_SEARCH_FIELDS,
-            )
+            else:
+                logger.warning("Milvus collection '%s' was not loaded at search time; loading and retrying once.", settings.milvus_collection)
+                self._load_collection(settings.milvus_collection)
+                raw_hits = self._client().search(
+                    collection_name=settings.milvus_collection,
+                    data=[query_embedding],
+                    filter=expression,
+                    limit=top_k,
+                    output_fields=DEFAULT_SEARCH_FIELDS,
+                )
         hits: list[Evidence] = []
         for group in raw_hits:
             for item in group:
@@ -345,19 +409,34 @@ class MilvusStore:
                 output_fields=DEFAULT_SEARCH_FIELDS,
             )
         except MilvusException as exc:
-            if exc.code != 101 and "collection not loaded" not in str(exc).lower():
+            error_text = str(exc).lower()
+            if exc.code == 700 and "index not found" in error_text:
+                logger.warning(
+                    "Milvus collection '%s' case search failed because index is missing; creating index and retrying once.",
+                    settings.milvus_case_collection,
+                )
+                self._ensure_vector_index(settings.milvus_case_collection)
+                self._load_collection(settings.milvus_case_collection)
+                raw_hits = self._client().search(
+                    collection_name=settings.milvus_case_collection,
+                    data=[query_embedding],
+                    limit=top_k,
+                    output_fields=DEFAULT_SEARCH_FIELDS,
+                )
+            elif exc.code != 101 and "collection not loaded" not in error_text:
                 raise
-            logger.warning(
-                "Milvus collection '%s' was not loaded at case search time; loading and retrying once.",
-                settings.milvus_case_collection,
-            )
-            self._load_collection(settings.milvus_case_collection)
-            raw_hits = self._client().search(
-                collection_name=settings.milvus_case_collection,
-                data=[query_embedding],
-                limit=top_k,
-                output_fields=DEFAULT_SEARCH_FIELDS,
-            )
+            else:
+                logger.warning(
+                    "Milvus collection '%s' was not loaded at case search time; loading and retrying once.",
+                    settings.milvus_case_collection,
+                )
+                self._load_collection(settings.milvus_case_collection)
+                raw_hits = self._client().search(
+                    collection_name=settings.milvus_case_collection,
+                    data=[query_embedding],
+                    limit=top_k,
+                    output_fields=DEFAULT_SEARCH_FIELDS,
+                )
         hits: list[Evidence] = []
         for group in raw_hits:
             for item in group:
@@ -380,6 +459,67 @@ class MilvusStore:
             return {"ok": True, "backend": settings.milvus_uri, "collections": [settings.milvus_collection, settings.milvus_case_collection]}
         except Exception as exc:
             return {"ok": False, "backend": settings.milvus_uri, "collections": [settings.milvus_collection, settings.milvus_case_collection], "error": str(exc)}
+
+    def _collection_stats(self, collection_name: str) -> dict[str, Any]:
+        settings = self._settings()
+        if _is_test_mode(settings):
+            local_count = len(chunks_table.all()) if collection_name == settings.milvus_collection else len(cases_table.all())
+            return {
+                "name": collection_name,
+                "exists": True,
+                "loaded": True,
+                "indexes": ["mock_local_index"],
+                "has_index": True,
+                "row_count": local_count,
+                "schema": {"mode": "mock"},
+            }
+        client = self._client()
+        if not client.has_collection(collection_name=collection_name):
+            return {"name": collection_name, "exists": False, "loaded": False, "indexes": [], "has_index": False}
+        description = self._describe_collection(collection_name) or {}
+        stats = client.get_collection_stats(collection_name=collection_name) or {}
+        fields = description.get("fields") if isinstance(description.get("fields"), list) else []
+        row_count = (
+            stats.get("row_count")
+            or stats.get("rows_count")
+            or stats.get("num_rows")
+            or stats.get("count")
+            or description.get("num_rows")
+            or description.get("row_count")
+        )
+        return {
+            "name": collection_name,
+            "exists": True,
+            "loaded": True,
+            "indexes": self._list_indexes(collection_name),
+            "has_index": self._has_vector_index(collection_name),
+            "row_count": row_count,
+            "schema": {
+                "fields": [
+                    {
+                        "name": field.get("name") or field.get("field_name"),
+                        "type": _normalize_datatype_name(field.get("type") or field.get("data_type")),
+                        "primary": bool(field.get("is_primary")),
+                    }
+                    for field in fields
+                    if isinstance(field, dict)
+                ]
+            },
+        }
+
+    def storage_status(self) -> dict[str, Any]:
+        settings = self._settings()
+        ping_result = self.ping()
+        collections = [
+            self._collection_stats(settings.milvus_collection),
+            self._collection_stats(settings.milvus_case_collection),
+        ]
+        return {
+            "backend": ping_result.get("backend"),
+            "ok": ping_result.get("ok", False),
+            "error": ping_result.get("error"),
+            "collections": collections,
+        }
 
 
 milvus_store = MilvusStore()
