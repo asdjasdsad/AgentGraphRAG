@@ -1,0 +1,18 @@
+{
+  "stage": "dpo",
+  "backend": "trl-dpo",
+  "base_model": "Qwen/Qwen2.5-Coder-3B-Instruct",
+  "dataset_path": "/mnt/data/NK/AgentGraphRAG/cypher-agent-ft/data/dpo/all.jsonl",
+  "output_dir": "/mnt/data/NK/AgentGraphRAG/cypher-agent-ft/outputs/adapters/dpo",
+  "metrics": {
+    "train_rows": 24,
+    "val_rows": 0
+  },
+  "command": [
+    "mock_dpo_runner",
+    "--config",
+    "/mnt/data/NK/AgentGraphRAG/cypher-agent-ft/configs/dpo.yaml",
+    "--dataset",
+    "/mnt/data/NK/AgentGraphRAG/cypher-agent-ft/data/dpo/all.jsonl"
+  ]
+}

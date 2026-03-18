@@ -1,0 +1,18 @@
+{
+  "stage": "sft",
+  "backend": "transformers-peft",
+  "base_model": "Qwen/Qwen2.5-Coder-3B-Instruct",
+  "dataset_path": "/mnt/data/NK/AgentGraphRAG/cypher-agent-ft/data/sft/all.jsonl",
+  "output_dir": "/mnt/data/NK/AgentGraphRAG/cypher-agent-ft/outputs/adapters/sft",
+  "metrics": {
+    "train_rows": 12,
+    "val_rows": 0
+  },
+  "command": [
+    "mock_sft_runner",
+    "--config",
+    "/mnt/data/NK/AgentGraphRAG/cypher-agent-ft/configs/sft.yaml",
+    "--dataset",
+    "/mnt/data/NK/AgentGraphRAG/cypher-agent-ft/data/sft/all.jsonl"
+  ]
+}

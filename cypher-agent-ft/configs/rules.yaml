@@ -1,0 +1,24 @@
+{
+  "alias_map": {
+    "油泵": "液压泵",
+    "漏油": "泄漏",
+    "过热": "温度过高"
+  },
+  "entity_catalog": {
+    "components": ["液压泵", "燃油泵", "作动筒", "调压阀"],
+    "phenomena": ["泄漏", "压力不足", "温度过高", "异响"],
+    "causes": ["密封件老化", "安装不当", "油路堵塞", "材料疲劳"],
+    "actions": ["更换密封件", "重新安装", "清洗油路", "更换组件"],
+    "documents": ["AMM-01", "SB-02", "CASE-03", "SRM-04"]
+  },
+  "business_rules": {
+    "must_return_defaults": {
+      "cause_trace": ["cause_name", "source_doc_ids"],
+      "action_lookup": ["action_name", "cause_name"],
+      "source_trace": ["source_doc_id", "chunk_id"],
+      "multi_hop_root_cause": ["cause_chain", "hop_count"],
+      "validation_check": ["issue_id", "cause_name", "action_names"]
+    },
+    "forbidden_patterns": ["unbounded_match", "full_graph_scan"]
+  }
+}

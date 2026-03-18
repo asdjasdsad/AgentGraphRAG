@@ -1,0 +1,55 @@
+[
+  {
+    "task_type": "cause_trace_with_component",
+    "question_type": "cause_trace",
+    "relation_type": "possible_causes",
+    "need_multihop": true,
+    "required_relations": ["INVOLVES_COMPONENT", "CAUSES"],
+    "max_hops": 2,
+    "must_include_component": true,
+    "must_return": ["cause_name", "source_doc_ids"],
+    "nl_template": "{component}出现{phenomenon}时，可能原因有哪些？"
+  },
+  {
+    "task_type": "action_lookup",
+    "question_type": "action_lookup",
+    "relation_type": "mitigation_lookup",
+    "need_multihop": true,
+    "required_relations": ["CAUSES", "MITIGATES"],
+    "max_hops": 2,
+    "must_return": ["action_name", "cause_name"],
+    "nl_template": "{component}出现{phenomenon}后，建议采取哪些处置措施？"
+  },
+  {
+    "task_type": "source_trace",
+    "question_type": "source_trace",
+    "relation_type": "evidence_trace",
+    "need_multihop": true,
+    "required_relations": ["CONTAINS", "MENTIONS"],
+    "max_hops": 3,
+    "must_include_source": true,
+    "must_return": ["source_doc_id", "chunk_id"],
+    "nl_template": "关于{cause}导致{phenomenon}的证据来源在哪些文档？"
+  },
+  {
+    "task_type": "multi_hop_root_cause",
+    "question_type": "multi_hop_root_cause",
+    "relation_type": "root_cause_chain",
+    "need_multihop": true,
+    "required_relations": ["CAUSES"],
+    "max_hops": 2,
+    "must_return": ["cause_chain", "hop_count"],
+    "nl_template": "{component}出现{phenomenon}时，多跳根因链如何追溯？"
+  },
+  {
+    "task_type": "validation_check",
+    "question_type": "validation_check",
+    "relation_type": "closure_validation",
+    "need_multihop": false,
+    "required_relations": ["INVOLVES_COMPONENT", "CAUSES", "MITIGATES"],
+    "max_hops": 2,
+    "must_include_component": true,
+    "must_return": ["issue_id", "cause_name", "action_names"],
+    "nl_template": "{component}针对{phenomenon}的原因与措施是否形成闭环？"
+  }
+]

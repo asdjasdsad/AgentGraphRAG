@@ -1,0 +1,17 @@
+{
+  "baseline": {
+    "graph_retrieval_hit_rate": 0.5,
+    "fallback_trigger_rate": 0.5,
+    "constraint_violation_rate": 0.5
+  },
+  "tuned": {
+    "graph_retrieval_hit_rate": 1.0,
+    "fallback_trigger_rate": 0.0,
+    "constraint_violation_rate": 0.0
+  },
+  "delta": {
+    "graph_retrieval_hit_rate": 0.5,
+    "fallback_trigger_rate": -0.5,
+    "constraint_violation_rate": -0.5
+  }
+}

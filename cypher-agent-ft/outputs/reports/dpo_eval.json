@@ -1,0 +1,79 @@
+{
+  "summary": {
+    "total": 6,
+    "syntax_pass_rate": 1.0,
+    "schema_compliance": 1.0,
+    "execution_success_rate": 1.0,
+    "business_logic_accuracy": 1.0,
+    "overall_pass_rate": 1.0,
+    "preference_accuracy": 1.0
+  },
+  "rows": [
+    {
+      "prompt_id": "prompt_8d2654d8bb0b",
+      "validation": {
+        "passed": true,
+        "syntax_passed": true,
+        "schema_passed": true,
+        "execution_passed": true,
+        "business_passed": true,
+        "errors": []
+      }
+    },
+    {
+      "prompt_id": "prompt_8d2654d8bb0b",
+      "validation": {
+        "passed": true,
+        "syntax_passed": true,
+        "schema_passed": true,
+        "execution_passed": true,
+        "business_passed": true,
+        "errors": []
+      }
+    },
+    {
+      "prompt_id": "prompt_7b44e28a3528",
+      "validation": {
+        "passed": true,
+        "syntax_passed": true,
+        "schema_passed": true,
+        "execution_passed": true,
+        "business_passed": true,
+        "errors": []
+      }
+    },
+    {
+      "prompt_id": "prompt_7b44e28a3528",
+      "validation": {
+        "passed": true,
+        "syntax_passed": true,
+        "schema_passed": true,
+        "execution_passed": true,
+        "business_passed": true,
+        "errors": []
+      }
+    },
+    {
+      "prompt_id": "prompt_4488e945fdfe",
+      "validation": {
+        "passed": true,
+        "syntax_passed": true,
+        "schema_passed": true,
+        "execution_passed": true,
+        "business_passed": true,
+        "errors": []
+      }
+    },
+    {
+      "prompt_id": "prompt_4488e945fdfe",
+      "validation": {
+        "passed": true,
+        "syntax_passed": true,
+        "schema_passed": true,
+        "execution_passed": true,
+        "business_passed": true,
+        "errors": []
+      }
+    }
+  ]
+}

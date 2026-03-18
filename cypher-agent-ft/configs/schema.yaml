@@ -1,0 +1,27 @@
+{
+  "node_types": {
+    "Issue": ["issue_id"],
+    "Phenomenon": ["canonical_name"],
+    "Component": ["canonical_name"],
+    "Cause": ["canonical_name"],
+    "Action": ["canonical_name"],
+    "Document": ["document_id"],
+    "Chunk": ["chunk_id", "page_no", "section_path"]
+  },
+  "property_keys": {
+    "Issue": ["issue_id"],
+    "Phenomenon": ["canonical_name"],
+    "Component": ["canonical_name"],
+    "Cause": ["canonical_name"],
+    "Action": ["canonical_name"],
+    "Document": ["document_id"],
+    "Chunk": ["chunk_id", "page_no", "section_path"]
+  },
+  "relation_types": [
+    {"pattern": "(:Issue)-[:INVOLVES_COMPONENT]->(:Component)", "source": "Issue", "type": "INVOLVES_COMPONENT", "target": "Component", "properties": []},
+    {"pattern": "(:Cause)-[:CAUSES]->(:Phenomenon)", "source": "Cause", "type": "CAUSES", "target": "Phenomenon", "properties": []},
+    {"pattern": "(:Action)-[:MITIGATES]->(:Cause)", "source": "Action", "type": "MITIGATES", "target": "Cause", "properties": []},
+    {"pattern": "(:Document)-[:CONTAINS]->(:Chunk)", "source": "Document", "type": "CONTAINS", "target": "Chunk", "properties": []},
+    {"pattern": "(:Chunk)-[:MENTIONS]->(:Cause)", "source": "Chunk", "type": "MENTIONS", "target": "Cause", "properties": []}
+  ]
+}
